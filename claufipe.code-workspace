@@ -1,0 +1,21 @@
+{
+	"folders": [
+		{
+			"path": "../../IAMIN"
+		},
+		{
+			"path": ".."
+		}
+	],
+	"settings": {
+		"sqltools.useNodeRuntime": true,
+		"sqltools.connections": [
+			{
+				"name": "db_finanzas",
+				"accessMode": "Read/Write",
+				"previewLimit": 50,
+				"driver": "DuckDB"
+			}
+		]
+	}
+}
