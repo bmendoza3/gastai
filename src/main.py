@@ -1,15 +1,21 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from pydantic import BaseModel
 from typing import Optional
 from datetime import datetime
 
+# capa de datos
 from src.db.storage import (
     insert_transactions,
     get_pending_transactions,
     get_transaction,
     set_transaction_category,
     set_transaction_intent,
+    con as db_con,
 )
+
+# integración con Meta
+from src.integrations.whatsapp_cloud import verify_token, send_message
+
 
 app = FastAPI(
     title="ClauFiPe",
@@ -17,9 +23,7 @@ app = FastAPI(
     version="0.1.0",
 )
 
-# -----------------------------
-# Modelos existentes
-# -----------------------------
+# ============== MODELOS ==============
 
 class NewTxRequest(BaseModel):
     tx_id: str
@@ -48,25 +52,34 @@ class SetIntentRequest(BaseModel):
 class SimpleMessage(BaseModel):
     message: str
 
-# --- NEW ---
 class WhatsAppMessageIn(BaseModel):
-    # lo que el usuario escribió en WhatsApp, tal cual texto plano
     text: str
 
 class WhatsAppMessageOut(BaseModel):
-    # lo que el bot contestaría
     reply: str
 
-# --- NEW ---
-CATEGORIES = ["Supermercado", "Farmacia", "Delivery", "Transporte", "Restaurantes", "Servicios", "Otros"]
+
+# ============== CONSTANTES ==============
+
+CATEGORIES = [
+    "Supermercado",
+    "Farmacia",
+    "Delivery",
+    "Transporte",
+    "Restaurantes",
+    "Servicios",
+    "Otros",
+]
+
 INTENTS = ["Planeado", "Imprevisto", "Antojo"]
 
-# --- NEW ---
+# estado conversacional en memoria
 conversation_state = {
     "mode": None,          # None | "awaiting_category" | "awaiting_intent"
-    "current_tx_id": None  # tx_id que estamos etiquetando
+    "current_tx_id": None  # tx_id que estamos editando
 }
 
+# ============== HELPERS ==============
 
 def _row_to_pending_payload(row) -> PendingTxResponse:
     return PendingTxResponse(
@@ -79,9 +92,19 @@ def _row_to_pending_payload(row) -> PendingTxResponse:
         intent=row.intent,
     )
 
-# -----------------------------
-# Endpoints base del agente
-# -----------------------------
+# ============== ROOT (para que no salga 404) ==============
+
+@app.get("/")
+def root():
+    return {
+        "app": "claufipe-finanzas",
+        "status": "ok",
+        "docs": "/docs",
+        "webhook": "/whatsapp/incoming",
+    }
+
+
+# ============== ENDPOINTS BASE ==============
 
 @app.post("/tx/new", response_model=SimpleMessage)
 def add_transaction(tx: NewTxRequest):
@@ -95,7 +118,7 @@ def add_transaction(tx: NewTxRequest):
         "intent": None,
         "needs_review": True,
     }])
-    return SimpleMessage(message="Transacción registrada y marcada como pendiente de clasificar.")
+    return SimpleMessage(message="Transacción registrada y marcada como pendiente.")
 
 
 @app.get("/tx/pending", response_model=Optional[PendingTxResponse])
@@ -103,83 +126,60 @@ def get_next_pending():
     df = get_pending_transactions(limit=1)
     if df.empty:
         return None
-    row = df.iloc[0]
-    return _row_to_pending_payload(row)
+    return _row_to_pending_payload(df.iloc[0])
 
 
 @app.post("/tx/set_category", response_model=SimpleMessage)
 def assign_category(body: SetCategoryRequest):
     set_transaction_category(body.tx_id, body.category)
     tx_final = get_transaction(body.tx_id)
-    return SimpleMessage(
-        message=f"Categoría '{body.category}' asignada a {body.tx_id}. "
-                f"Estado actual: category={tx_final['category']}, intent={tx_final['intent']}."
-    )
+    return SimpleMessage(message=f"Categoría '{body.category}' asignada. intent={tx_final['intent']}")
 
 
 @app.post("/tx/set_intent", response_model=SimpleMessage)
 def assign_intent(body: SetIntentRequest):
     set_transaction_intent(body.tx_id, body.intent)
     tx_final = get_transaction(body.tx_id)
-    return SimpleMessage(
-        message=f"Intención '{body.intent}' asignada a {body.tx_id}. "
-                f"Ahora needs_review={tx_final['needs_review']}."
-    )
+    return SimpleMessage(message=f"Intención '{body.intent}' asignada. needs_review={tx_final['needs_review']}")
 
 
-# -----------------------------
-# --- NEW ---
-# /whatsapp/webhook
-# -----------------------------
+# ============== LÓGICA CONVERSACIONAL LOCAL ==============
+
 @app.post("/whatsapp/webhook", response_model=WhatsAppMessageOut)
 def whatsapp_webhook(msg: WhatsAppMessageIn):
-    """
-    Este endpoint simula lo que haría WhatsApp:
-    - msg.text es lo que tú escribes.
-    - devolvemos .reply que sería lo que el bot te manda.
-    - conversation_state mantiene el contexto (en qué paso vamos).
-    """
-
     user_text = msg.text.strip()
 
-    # 1. Si estamos esperando categoría:
+    # 1) esperando categoría
     if conversation_state["mode"] == "awaiting_category" and conversation_state["current_tx_id"]:
-        chosen_category = user_text  # Ej: "Farmacia"
-        # validamos que exista dentro de las categorías conocidas
+        chosen_category = user_text
         if chosen_category not in CATEGORIES:
-            # si no calza, ofrecemos las opciones
-            opts = ", ".join(CATEGORIES)
             return WhatsAppMessageOut(
-                reply=f"No caché esa categoría 🤔. Elige una de: {opts}"
+                reply=f"No caché esa categoría 🤔. Opciones: {', '.join(CATEGORIES)}"
             )
 
-        # guardamos categoría
         set_transaction_category(conversation_state["current_tx_id"], chosen_category)
-
-        # avanzamos a preguntar intención
         conversation_state["mode"] = "awaiting_intent"
-        opts_int = ", ".join(INTENTS)
+
         return WhatsAppMessageOut(
-            reply=f"✔ Categoría '{chosen_category}' guardada.\n"
-                  f"¿Fue Planeado, Imprevisto o Antojo?\n"
-                  f"Opciones: {opts_int}"
+            reply=(
+                f"✔ Categoría '{chosen_category}' guardada.\n"
+                f"¿Fue Planeado, Imprevisto o Antojo?\n"
+                f"Opciones: {', '.join(INTENTS)}"
+            )
         )
 
-    # 2. Si estamos esperando intención:
+    # 2) esperando intención
     if conversation_state["mode"] == "awaiting_intent" and conversation_state["current_tx_id"]:
-        chosen_intent = user_text  # Ej: "Imprevisto"
+        chosen_intent = user_text
         if chosen_intent not in INTENTS:
-            opts_int = ", ".join(INTENTS)
             return WhatsAppMessageOut(
-                reply=f"No caché esa intención 🙈. Opciones: {opts_int}"
+                reply=f"No caché esa intención 🙈. Opciones: {', '.join(INTENTS)}"
             )
 
-        # guardamos intención y marcamos needs_review=False en storage
         set_transaction_intent(conversation_state["current_tx_id"], chosen_intent)
-
         tx_final = get_transaction(conversation_state["current_tx_id"])
 
-        # cerramos la conversación
+        # limpiar estado
         conversation_state["mode"] = None
         conversation_state["current_tx_id"] = None
 
@@ -190,41 +190,101 @@ def whatsapp_webhook(msg: WhatsAppMessageIn):
                 f"Descripción: {tx_final['description']}\n"
                 f"Categoría: {tx_final['category']}\n"
                 f"Intención: {tx_final['intent']}\n"
-                "Guardado.\n"
                 "¿Quieres revisar otro gasto? Escribe: revisar"
             )
         )
 
-    # 3. Si el usuario escribe "revisar":
+    # 3) comando "revisar"
     if user_text.lower() in ["revisar", "pendiente", "siguiente"]:
         df = get_pending_transactions(limit=1)
         if df.empty:
             return WhatsAppMessageOut(
-                reply="No tienes gastos pendientes 🎉"
+                reply=(
+                    "No tienes gastos pendientes 🎉\n\n"
+                    "Puedes:\n"
+                    "1) Insertar uno nuevo vía API (/tx/new)\n"
+                    "2) O volver a escribir 'revisar' cuando entre otro gasto."
+                )
             )
-        row = df.iloc[0]
 
-        # seteamos contexto conversación
+        row = df.iloc[0]
         conversation_state["mode"] = "awaiting_category"
         conversation_state["current_tx_id"] = row.tx_id
 
-        opts = ", ".join(CATEGORIES)
         return WhatsAppMessageOut(
             reply=(
                 "Tengo este gasto pendiente:\n"
                 f"- {abs(row.amount_clp):,.0f} CLP en {row.description}\n"
                 f"- Fecha: {row.ts}\n\n"
                 f"¿En qué categoría lo pongo?\n"
-                f"Opciones: {opts}"
+                f"Opciones: {', '.join(CATEGORIES)}"
             )
         )
 
-    # 4. Si manda cualquier otra cosa fuera de flujo:
+    # 4) mensaje fuera de flujo
     return WhatsAppMessageOut(
         reply=(
             "Hola 👋 Soy tu agente de gastos.\n"
-            "Escribe:\n"
-            "- 'revisar' para clasificar el próximo gasto pendiente\n"
-            "- o responde una categoría/intención si ya estamos en eso"
+            "Escribe 'revisar' para clasificar el próximo gasto pendiente."
         )
     )
+
+
+# ============== DEBUG (ver DB) ==============
+
+@app.get("/debug/transactions")
+def debug_transactions():
+    df = db_con.execute("""
+        SELECT tx_id, ts, description, amount_clp, account_id, category, intent, needs_review
+        FROM transactions
+        ORDER BY ts DESC
+    """).fetchdf()
+    return df.to_dict(orient="records")
+
+
+# ============== WEBHOOK DE META (ENTRANTE) ==============
+
+@app.get("/whatsapp/incoming")
+async def whatsapp_verify(request: Request):
+    mode = request.query_params.get("hub.mode")
+    token = request.query_params.get("hub.verify_token")
+    challenge = request.query_params.get("hub.challenge")
+    print("✅ VERIF GET:", mode, token, challenge)
+    res = verify_token(mode, token, challenge)
+    if res is not None:
+        return res
+    return {"error": "invalid token"}
+
+
+@app.post("/whatsapp/incoming")
+async def whatsapp_incoming(request: Request):
+    body = await request.json()
+    print("📩 LLEGÓ POST DE META:", body)
+
+    # la estructura típica: entry[0].changes[0].value.messages[0]
+    try:
+        value = body["entry"][0]["changes"][0]["value"]
+    except Exception:
+        return {"status": "no-value"}
+
+    # si son mensajes reales
+    if "messages" in value:
+        message = value["messages"][0]
+        text = message["text"]["body"]
+        from_number = message["from"]
+
+        print(f"[WHATSAPP] {from_number} → {text}")
+
+        # pasar a nuestra lógica interna
+        bot_reply = whatsapp_webhook(WhatsAppMessageIn(text=text))
+
+        # responder por la Cloud API
+        send_message(from_number, bot_reply.reply)
+
+        print(f"[WHATSAPP] BOT → {bot_reply.reply}")
+
+        return {"status": "sent"}
+
+    # si no venía messages, puede ser delivery/status
+    print("ℹ️ No venía 'messages' en el webhook. Claves:", value.keys())
+    return {"status": "ignored"}

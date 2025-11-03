@@ -3,7 +3,12 @@ from pathlib import Path
 from typing import List, Dict
 import pandas as pd
 
-DB_PATH = Path(__file__).resolve().parents[2] / "data" / "finanzas.duckdb"
+# 1) aseguramos que exista la carpeta data/
+BASE_DIR = Path(__file__).resolve().parents[2]
+DATA_DIR = BASE_DIR / "data"
+DATA_DIR.mkdir(parents=True, exist_ok=True)
+
+DB_PATH = DATA_DIR / "finanzas.duckdb"
 con = duckdb.connect(str(DB_PATH))
 
 
