@@ -76,14 +76,24 @@ def set_transaction_intent(tx_id: str, intent: str):
 
 # ----------------- Consultas -----------------
 
-def get_pending_transactions(limit: int = 5) -> pd.DataFrame:
-    return con.execute(f"""
+def get_pending_transactions(account_id:str|None=None,
+                             limit: int = 5) -> pd.DataFrame:
+    if account_id is None:
+        return con.execute(f"""
         SELECT *
         FROM transactions
         WHERE needs_review = TRUE
         ORDER BY ts ASC
         LIMIT {limit}
-    """).fetchdf()
+        """).fetchdf()
+    
+    return con.execute(f"""
+        SELECT *
+        FROM transactions
+        WHERE needs_review = TRUE and account_id = ?
+        ORDER BY ts ASC
+        LIMIT {limit}
+        """,[account_id]).fetchdf()
 
 
 def get_transaction(tx_id: str) -> Dict:
