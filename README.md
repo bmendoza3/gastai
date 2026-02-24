@@ -1,4 +1,4 @@
-# Claufipe
+# GastAI
 
 Agente financiero personal que:
 1. Lee notificaciones de gasto desde el correo (ej: banco / tarjeta).

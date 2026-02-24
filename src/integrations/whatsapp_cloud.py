@@ -7,7 +7,7 @@ load_dotenv()
 
 META_PHONE_NUMBER_ID = os.getenv("META_PHONE_NUMBER_ID")
 META_ACCESS_TOKEN = os.getenv("META_ACCESS_TOKEN")
-META_VERIFY_TOKEN = os.getenv("META_VERIFY_TOKEN", "claufipe_verify")
+META_VERIFY_TOKEN = os.getenv("META_VERIFY_TOKEN", "gastai_verify")
 
 GRAPH_URL = f"https://graph.facebook.com/v20.0/{META_PHONE_NUMBER_ID}/messages"
 

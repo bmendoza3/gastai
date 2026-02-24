@@ -1,1 +1,1 @@
-"""Agente de finanzas personales Claufipe."""
+"""Agente de finanzas personales GastAI."""
