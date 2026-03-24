@@ -9,8 +9,11 @@ from src.db.storage import (
     set_transaction_intent,
 )
 
-CATEGORIES = ["supermercado", "farmacia", "delivery", "transporte", "restaurantes", "servicios", "otros"]
-INTENTS = ["planeado", "imprevisto", "antojo"]
+CATEGORIES = [
+    "transporte", "comida", "supermercado", "salud", "entretenimiento",
+    "suscripciones", "ropa", "educacion", "hogar", "trabajo", "viajes", "otros",
+]
+INTENTS = ["previsto", "imprevisto"]
 
 TOOLS = [
     {
@@ -33,10 +36,7 @@ TOOLS = [
         "function": {
             "name": "get_pending",
             "description": "Obtiene el próximo gasto pendiente de clasificar para este usuario.",
-            "parameters": {
-                "type": "object",
-                "properties": {},
-            },
+            "parameters": {"type": "object", "properties": {}, "required": []},
         },
     },
     {
@@ -56,7 +56,7 @@ TOOLS = [
                     "intent": {
                         "type": "string",
                         "enum": INTENTS,
-                        "description": "Intención del gasto: planeado, imprevisto o antojo",
+                        "description": "Si el gasto era previsto o imprevisto",
                     },
                 },
                 "required": ["tx_id", "category", "intent"],
@@ -76,12 +76,30 @@ TOOLS = [
             },
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_spend_chart",
+            "description": "Genera y envía un gráfico visual de gastos por categoría. Úsalo cuando el usuario pida ver un gráfico, reporte visual o resumen visual.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "days": {"type": "integer", "description": "Días hacia atrás (default 7)"},
+                    "chart_type": {
+                        "type": "string",
+                        "enum": ["pie", "bar"],
+                        "description": "Tipo de gráfico: torta (pie) o barras (bar)",
+                    },
+                },
+            },
+        },
+    },
 ]
 
 
 def run_tool(name: str, inputs: dict, phone: str) -> str:
     if name == "register_expense":
-        amount = abs(float(inputs["amount"])) * -1  # gastos son negativos en DB
+        amount = abs(float(inputs["amount"])) * -1
         description = inputs["description"]
         tx_id = f"wa-{int(datetime.now().timestamp())}"
         insert_transactions([{
@@ -89,15 +107,16 @@ def run_tool(name: str, inputs: dict, phone: str) -> str:
             "timestamp": datetime.now().isoformat(),
             "description": description,
             "amount_clp": amount,
-            "account_id": phone,
+            "user_phone": phone,
             "category": None,
             "intent": None,
             "needs_review": True,
+            "source": "manual",
         }])
         return f"Gasto registrado: {abs(amount):,.0f} CLP en '{description}'. tx_id={tx_id}"
 
     if name == "get_pending":
-        df = get_pending_transactions(account_id=phone, limit=1)
+        df = get_pending_transactions(user_phone=phone, limit=1)
         if df.empty:
             return "No hay gastos pendientes de clasificar."
         row = df.iloc[0]
@@ -115,11 +134,17 @@ def run_tool(name: str, inputs: dict, phone: str) -> str:
         return f"Clasificado: '{tx['description']}' → {tx['category']} / {tx['intent']}"
 
     if name == "get_spend_summary":
-        days = inputs.get("days", 7)
-        df = get_spend_by_category(days_back=days)
+        days = int(inputs.get("days", 7))
+        df = get_spend_by_category(user_phone=phone, days_back=days)
         if df.empty:
             return f"Sin gastos registrados en los últimos {days} días."
         lines = [f"- {row.category}: {row.spent_clp:,.0f} CLP" for _, row in df.iterrows()]
         return f"Gastos últimos {days} días:\n" + "\n".join(lines)
+
+    if name == "get_spend_chart":
+        # Retorna señal especial para que el webhook envíe la imagen
+        days = int(inputs.get("days", 7))
+        chart_type = inputs.get("chart_type", "bar")
+        return f"__CHART__:{chart_type}:{days}"
 
     return f"Tool desconocida: {name}"
