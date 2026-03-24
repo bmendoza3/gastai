@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="es">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>GastAI — Personal Finance Agent</title>
+  <title>GastAI — Tu agente financiero personal</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
@@ -20,7 +20,6 @@
       gap: 12px;
     }
     header h1 { font-size: 1.6rem; font-weight: 700; letter-spacing: -0.5px; }
-    header span { font-size: 1.6rem; }
     .hero {
       max-width: 720px;
       margin: 80px auto;
@@ -38,6 +37,11 @@
       font-size: 1.15rem;
       color: #555;
       line-height: 1.7;
+      margin-bottom: 16px;
+    }
+    .hero .sub {
+      font-size: 0.95rem;
+      color: #888;
       margin-bottom: 40px;
     }
     .badge {
@@ -49,9 +53,37 @@
       font-size: 1rem;
       font-weight: 600;
     }
+    .banks {
+      max-width: 680px;
+      margin: 0 auto 60px;
+      padding: 0 24px;
+      text-align: center;
+    }
+    .banks p {
+      font-size: 0.85rem;
+      color: #aaa;
+      margin-bottom: 16px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .bank-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      justify-content: center;
+    }
+    .bank-list span {
+      background: white;
+      border: 1px solid #e5e7eb;
+      border-radius: 20px;
+      padding: 6px 16px;
+      font-size: 0.88rem;
+      color: #444;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+    }
     .features {
       max-width: 800px;
-      margin: 60px auto;
+      margin: 0 auto 80px;
       padding: 0 24px;
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -66,6 +98,30 @@
     .card .icon { font-size: 2rem; margin-bottom: 12px; }
     .card h3 { font-size: 1rem; font-weight: 700; margin-bottom: 8px; }
     .card p { font-size: 0.9rem; color: #666; line-height: 1.6; }
+    .how {
+      background: #1a1a2e;
+      color: white;
+      padding: 60px 24px;
+      text-align: center;
+    }
+    .how h2 { font-size: 1.8rem; font-weight: 800; margin-bottom: 40px; }
+    .steps {
+      max-width: 680px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 32px;
+    }
+    .step { text-align: center; }
+    .step .num {
+      width: 40px; height: 40px;
+      background: #25D366;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 800; font-size: 1.1rem;
+      margin: 0 auto 12px;
+    }
+    .step p { font-size: 0.95rem; color: #ccc; line-height: 1.5; }
     footer {
       text-align: center;
       padding: 40px 24px;
@@ -82,40 +138,79 @@
   </header>
 
   <section class="hero">
-    <h2>Your personal finance agent, on WhatsApp.</h2>
+    <h2>Entiende en qué gastas tu plata, sin esfuerzo.</h2>
     <p>
-      GastAI connects to your bank email notifications and helps you track,
-      classify, and understand your spending — all through a simple WhatsApp conversation.
-      No app to download. No dashboard to check. Just chat.
+      GastAI lee las alertas de tu banco, registra cada gasto automáticamente
+      y te ayuda a clasificarlos por WhatsApp. Sin apps, sin formularios.
+      Solo un chat.
     </p>
-    <span class="badge">💬 Available on WhatsApp</span>
+    <p class="sub">Disponible para los principales bancos de Chile</p>
+    <span class="badge">💬 Todo por WhatsApp</span>
+  </section>
+
+  <section class="banks">
+    <p>Compatible con</p>
+    <div class="bank-list">
+      <span>Banco de Chile</span>
+      <span>Santander</span>
+      <span>BCI</span>
+      <span>Itaú</span>
+      <span>Banco Estado</span>
+      <span>Scotiabank</span>
+      <span>Falabella</span>
+      <span>Tenpo</span>
+      <span>MACH</span>
+      <span>Mercado Pago</span>
+    </div>
   </section>
 
   <section class="features">
     <div class="card">
       <div class="icon">📩</div>
-      <h3>Automatic ingestion</h3>
-      <p>Reads your bank email alerts and logs every transaction automatically.</p>
+      <h3>Ingesta automática</h3>
+      <p>Conecta tu email y GastAI detecta cada compra con tarjeta o cuenta corriente al instante.</p>
     </div>
     <div class="card">
       <div class="icon">🏷️</div>
-      <h3>Smart classification</h3>
-      <p>Classify expenses by category and intent through a natural conversation.</p>
+      <h3>Clasificación inteligente</h3>
+      <p>Responde en lenguaje natural: "comida, era imprevisto" y el agente lo registra solo.</p>
     </div>
     <div class="card">
       <div class="icon">📊</div>
-      <h3>Visual reports</h3>
-      <p>Get weekly spending summaries and charts sent directly to your WhatsApp.</p>
+      <h3>Reportes visuales</h3>
+      <p>Recibe resúmenes semanales con gráficos directo en tu WhatsApp. Sin entrar a ninguna app.</p>
     </div>
     <div class="card">
       <div class="icon">🐜</div>
-      <h3>Ant expense detection</h3>
-      <p>Spot small recurring expenses that silently drain your budget.</p>
+      <h3>Gastos hormiga</h3>
+      <p>Detecta esos gastos chicos y repetidos que suman más de lo que crees al mes.</p>
+    </div>
+  </section>
+
+  <section class="how">
+    <h2>¿Cómo funciona?</h2>
+    <div class="steps">
+      <div class="step">
+        <div class="num">1</div>
+        <p>Tu banco te manda un email con la alerta de compra</p>
+      </div>
+      <div class="step">
+        <div class="num">2</div>
+        <p>GastAI lo lee y te avisa por WhatsApp con los detalles</p>
+      </div>
+      <div class="step">
+        <div class="num">3</div>
+        <p>Tú lo clasificas respondiendo el chat en segundos</p>
+      </div>
+      <div class="step">
+        <div class="num">4</div>
+        <p>Cada semana recibes tu resumen de gastos con gráfico</p>
+      </div>
     </div>
   </section>
 
   <footer>
-    &copy; 2026 GastAI. Built with ❤️ in Chile.
+    &copy; 2026 GastAI &mdash; Hecho en Chile 🇨🇱
   </footer>
 
 </body>
