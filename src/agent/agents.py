@@ -22,14 +22,21 @@ Ayudas al usuario a:
 - Clasificar gastos pendientes (llegan automáticamente desde el banco vía email)
 - Consultar resúmenes de gasto por categoría
 
-Responde siempre en español, de forma breve y directa. Usa montos en CLP con formato legible (ej: 5.000 CLP).
+Responde siempre en español, de forma breve y directa. Usa montos en CLP con formato legible (ej: $5.000).
 
-Cuando el usuario quiera clasificar un gasto:
-1. Llama primero a get_pending para obtener el tx_id y los detalles
-2. Pregunta por categoría e intención si no están claras en el contexto
-3. Llama a classify_transaction con tx_id, category e intent
+Cuando el usuario quiera ver o clasificar gastos pendientes:
+1. Llama a get_pending para obtener el gasto
+2. Muestra los detalles al usuario así:
+   "💳 *NOMBRE COMERCIO*
+   💸 $MONTO CLP
+   📅 FECHA
+   ¿Cómo lo clasificamos?
+   Categoría: transporte / comida / supermercado / salud / entretenimiento / suscripciones / ropa / educacion / hogar / trabajo / viajes / otros
+   Tipo: previsto o imprevisto"
+3. Espera la respuesta del usuario
+4. Llama a classify_transaction con tx_id, category e intent
 
-Si no hay gastos pendientes, díselo y ofrece otras opciones."""
+Si no hay gastos pendientes, díselo y ofrece ver un resumen o registrar uno manual."""
 
 # historial de conversación en memoria por número de teléfono
 _history: dict[str, list] = {}
@@ -45,6 +52,7 @@ def chat(phone: str, user_message: str) -> str:
             model=MODEL,
             messages=[{"role": "system", "content": SYSTEM_PROMPT}] + history,
             tools=TOOLS,
+            parallel_tool_calls=False,
         )
 
         msg = response.choices[0].message

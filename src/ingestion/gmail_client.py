@@ -54,12 +54,13 @@ def build_gmail_service():
 def list_messages(service, query: str, max_results: int = 50) -> List[Dict[str, Any]]:
     """
     Busca mensajes por query de Gmail (misma sintaxis que en la UI).
+    Incluye Spam y Trash para no perder alertas bancarias eliminadas.
     Devuelve una lista de dicts con 'id' y 'threadId'.
     """
     resp = (
         service.users()
         .messages()
-        .list(userId="me", q=query, maxResults=max_results)
+        .list(userId="me", q=query, maxResults=max_results, includeSpamTrash=True)
         .execute()
     )
     return resp.get("messages", [])
@@ -85,36 +86,47 @@ def _decode_part(part: Dict[str, Any]) -> str:
     return decoded_bytes.decode("UTF-8", errors="ignore")
 
 
+def _strip_html(html: str) -> str:
+    """Elimina tags HTML y decodifica entidades básicas."""
+    import re as _re
+    text = _re.sub(r"<[^>]+>", " ", html)
+    text = (text
+            .replace("&amp;", "&").replace("&lt;", "<").replace("&gt;", ">")
+            .replace("&nbsp;", " ").replace("&#160;", " "))
+    return _re.sub(r"\s+", " ", text).strip()
+
+
 def extract_text_from_message(message: Dict[str, Any]) -> str:
     """
-    Convierte el contenido del mail (multipart/HTML/etc.) en texto plano.
-    No es perfecto pero sirve para parsear.
+    Extrae texto plano del email. Prefiere text/plain sobre text/html.
+    Si solo hay HTML, stripea los tags para obtener texto parseable.
     """
     payload = message.get("payload", {})
     mime_type = payload.get("mimeType", "")
 
-    # 1) Caso texto plano único
     if mime_type == "text/plain":
         return _decode_part(payload)
 
-    # 2) Caso HTML único
     if mime_type == "text/html":
-        html = _decode_part(payload)
-        # podrías limpiar HTML aquí si quieres, por ahora lo devolvemos tal cual
-        return html
+        return _strip_html(_decode_part(payload))
 
-    # 3) Caso multipart
     if mime_type.startswith("multipart/"):
-        texts: list[str] = []
+        plain_parts: list[str] = []
+        html_parts: list[str] = []
 
         def walk_parts(part: Dict[str, Any]):
             mt = part.get("mimeType", "")
-            if mt in ("text/plain", "text/html"):
-                texts.append(_decode_part(part))
+            if mt == "text/plain":
+                plain_parts.append(_decode_part(part))
+            elif mt == "text/html":
+                html_parts.append(_decode_part(part))
             for sub in part.get("parts", []) or []:
                 walk_parts(sub)
 
         walk_parts(payload)
-        return "\n\n".join(texts)
+
+        if plain_parts:
+            return "\n\n".join(plain_parts)
+        return _strip_html("\n\n".join(html_parts))
 
     return ""

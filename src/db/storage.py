@@ -1,9 +1,11 @@
+import logging
 import duckdb
 from pathlib import Path
-from typing import List, Dict
+from typing import List, Dict, Optional
 import pandas as pd
 
-# 1) aseguramos que exista la carpeta data/
+logger = logging.getLogger(__name__)
+
 BASE_DIR = Path(__file__).resolve().parents[2]
 DATA_DIR = BASE_DIR / "data"
 DATA_DIR.mkdir(parents=True, exist_ok=True)
@@ -13,48 +15,94 @@ con = duckdb.connect(str(DB_PATH))
 
 
 def init_db():
-    """
-    Crea las tablas necesarias si no existen.
-    """
     con.execute("""
-    CREATE TABLE IF NOT EXISTS transactions (
-        tx_id TEXT PRIMARY KEY,
-        ts TIMESTAMP,
-        description TEXT,
-        amount_clp DOUBLE,
-        account_id TEXT,
-        category TEXT,
-        intent TEXT,
-        needs_review BOOLEAN
+    CREATE TABLE IF NOT EXISTS users (
+        phone       TEXT PRIMARY KEY,
+        name        TEXT,
+        gmail_query TEXT,
+        bank        TEXT,
+        created_at  TIMESTAMP DEFAULT NOW()
     );
     """)
+
+    con.execute("""
+    CREATE TABLE IF NOT EXISTS transactions (
+        tx_id       TEXT PRIMARY KEY,
+        user_phone  TEXT,
+        ts          TIMESTAMP,
+        description TEXT,
+        amount_clp  DOUBLE,
+        category    TEXT,
+        intent      TEXT,
+        needs_review BOOLEAN,
+        source      TEXT DEFAULT 'manual'
+    );
+    """)
+
+    # Migración: si existe columna account_id (schema viejo), renombrar
+    cols = [r[0] for r in con.execute(
+        "SELECT column_name FROM information_schema.columns WHERE table_name='transactions'"
+    ).fetchall()]
+    if "account_id" in cols and "user_phone" not in cols:
+        logger.info("Migrando schema: account_id → user_phone")
+        con.execute("ALTER TABLE transactions RENAME COLUMN account_id TO user_phone")
+    if "source" not in cols:
+        con.execute("ALTER TABLE transactions ADD COLUMN source TEXT DEFAULT 'manual'")
 
 
 init_db()
 
+
+# ----------------- Usuarios -----------------
+
+def upsert_user(phone: str, name: str, gmail_query: str, bank: str):
+    con.execute("""
+        INSERT INTO users (phone, name, gmail_query, bank)
+        VALUES (?, ?, ?, ?)
+        ON CONFLICT (phone) DO UPDATE SET
+            name = excluded.name,
+            gmail_query = excluded.gmail_query,
+            bank = excluded.bank
+    """, [phone, name, gmail_query, bank])
+
+
+def get_user(phone: str) -> Optional[Dict]:
+    df = con.execute("SELECT * FROM users WHERE phone = ?", [phone]).fetchdf()
+    return df.to_dict(orient="records")[0] if not df.empty else None
+
+
+def get_all_users() -> List[Dict]:
+    return con.execute("SELECT * FROM users").fetchdf().to_dict(orient="records")
+
+
 # ----------------- Insertar / actualizar -----------------
 
-def insert_transactions(rows: List[Dict]):
-    if not rows:
-        return
-
+def insert_transactions(rows: List[Dict]) -> List[str]:
+    """Inserta transacciones nuevas. Retorna lista de tx_ids efectivamente insertados."""
+    new_ids = []
     for r in rows:
+        existing = con.execute(
+            "SELECT tx_id FROM transactions WHERE tx_id = ?", [r["tx_id"]]
+        ).fetchone()
+        if existing is not None:
+            continue
         con.execute("""
-            INSERT OR IGNORE INTO transactions
-            (tx_id, ts, description, amount_clp, account_id, category, intent, needs_review)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            [
-                r["tx_id"],
-                r["timestamp"],
-                r["description"],
-                r["amount_clp"],
-                r["account_id"],
-                r.get("category"),
-                r.get("intent"),
-                r.get("needs_review", True),
-            ],
-        )
+            INSERT INTO transactions
+            (tx_id, user_phone, ts, description, amount_clp, category, intent, needs_review, source)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, [
+            r["tx_id"],
+            r["user_phone"],
+            r["timestamp"],
+            r["description"],
+            r["amount_clp"],
+            r.get("category"),
+            r.get("intent"),
+            r.get("needs_review", True),
+            r.get("source", "manual"),
+        ])
+        new_ids.append(r["tx_id"])
+    return new_ids
 
 
 def set_transaction_category(tx_id: str, category: str):
@@ -65,10 +113,9 @@ def set_transaction_category(tx_id: str, category: str):
 
 
 def set_transaction_intent(tx_id: str, intent: str):
-    # actualiza intención y marca revisado si ya hay categoría
     con.execute("""
         UPDATE transactions
-        SET intent = ?, 
+        SET intent = ?,
             needs_review = CASE WHEN category IS NOT NULL THEN FALSE ELSE needs_review END
         WHERE tx_id = ?
     """, [intent, tx_id])
@@ -76,38 +123,33 @@ def set_transaction_intent(tx_id: str, intent: str):
 
 # ----------------- Consultas -----------------
 
-def get_pending_transactions(account_id:str|None=None,
-                             limit: int = 5) -> pd.DataFrame:
-    if account_id is None:
-        return con.execute(f"""
-        SELECT *
-        FROM transactions
-        WHERE needs_review = TRUE
-        ORDER BY ts ASC
-        LIMIT {limit}
-        """).fetchdf()
-    
-    return con.execute(f"""
-        SELECT *
-        FROM transactions
-        WHERE needs_review = TRUE and account_id = ?
-        ORDER BY ts ASC
-        LIMIT {limit}
-        """,[account_id]).fetchdf()
+def get_pending_transactions(user_phone: Optional[str] = None, limit: int = 5) -> pd.DataFrame:
+    limit = int(limit)  # evita inyección
+    if user_phone is None:
+        return con.execute(
+            f"SELECT * FROM transactions WHERE needs_review = TRUE ORDER BY ts ASC LIMIT {limit}"
+        ).fetchdf()
+    return con.execute(
+        f"SELECT * FROM transactions WHERE needs_review = TRUE AND user_phone = ? ORDER BY ts ASC LIMIT {limit}",
+        [user_phone]
+    ).fetchdf()
 
 
-def get_transaction(tx_id: str) -> Dict:
+def get_transaction(tx_id: str) -> Optional[Dict]:
     df = con.execute("SELECT * FROM transactions WHERE tx_id = ?", [tx_id]).fetchdf()
     return df.to_dict(orient="records")[0] if not df.empty else None
 
 
-def get_spend_by_category(days_back: int = 7) -> pd.DataFrame:
-    return con.execute(f"""
+def get_spend_by_category(user_phone: Optional[str] = None, days_back: int = 7) -> pd.DataFrame:
+    days_back = int(days_back)  # evita inyección
+    base = f"""
         SELECT
-            COALESCE(category, 'Sin categoría') AS category,
+            COALESCE(category, 'sin categoría') AS category,
             SUM(ABS(amount_clp)) AS spent_clp
         FROM transactions
         WHERE ts >= NOW() - INTERVAL {days_back} DAY
-        GROUP BY category
-        ORDER BY spent_clp DESC
-    """).fetchdf()
+    """
+    if user_phone:
+        return con.execute(base + " AND user_phone = ? GROUP BY category ORDER BY spent_clp DESC",
+                           [user_phone]).fetchdf()
+    return con.execute(base + " GROUP BY category ORDER BY spent_clp DESC").fetchdf()

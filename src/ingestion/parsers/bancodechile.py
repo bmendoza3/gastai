@@ -1,5 +1,4 @@
-# src/ingestion/parsers/bancochile.py
-
+# src/ingestion/parsers/bancodechile.py
 from __future__ import annotations
 
 import re
@@ -16,54 +15,56 @@ class ParsedExpense:
     account_hint: str  # ej: 'BancoChile-TC-1234'
 
 
-def parse_bancochile_email(sender: str, subject: str, body: str) -> Optional[ParsedExpense]:
-    """
-    Intenta parsear un mail del Banco de Chile que corresponda a un gasto.
-    Si no reconoce el formato, devuelve None.
-    """
+# Patrón basado en el formato real del email:
+# "compra por $33.110 con cargo a Cuenta ****7506 en LA MOM BY RAVAL D el 22/03/2026 12:34"
+# "compra por $23.960 con Tarjeta de Crédito ****6982 en MERCADOPAGO*MERCADOLIBRE Las Condes CL el 22/03/2026 21:27"
+_PATTERN = re.compile(
+    r"compra por \$([\d\.]+)"          # monto: $33.110
+    r".+?\*{4}(\d{4})"                 # últimos 4 dígitos de la cuenta/tarjeta
+    r" en (.+?)"                       # comercio
+    r" el (\d{2}/\d{2}/\d{4} \d{2}:\d{2})",  # fecha y hora
+    re.IGNORECASE | re.DOTALL,
+)
 
+
+def parse_bancochile_email(sender: str, subject: str, body: str) -> Optional[ParsedExpense]:
     sender_l = sender.lower()
-    subj_l = subject.lower()
     body_l = body.lower()
 
-    # 1) Filtro grueso: sólo si parece aviso de compra
-    if "bancodechile" not in sender_l and "banco de chile" not in body_l:
+    # Filtro: solo emails de BancoChile con aviso de compra
+    if "bancochile" not in sender_l and "banco de chile" not in body_l:
+        return None
+    if "compra por" not in body_l:
         return None
 
-    if "compra con tarjeta" not in subj_l and "compra con su tarjeta" not in body_l:
-        # puedes ir agregando más variantes a medida que veas mails reales
+    m = _PATTERN.search(body)
+    if not m:
         return None
 
-    # 2) Buscar monto (ej: $ 12.345, $12.345, CLP 12.345)
-    monto_re = re.search(r"\$ ?([\d\.]+)", body)
-    if not monto_re:
-        return None
+    monto_txt, last4, comercio, fecha_txt = m.group(1), m.group(2), m.group(3), m.group(4)
 
-    monto_txt = monto_re.group(1)  # '12.345'
-    monto_clean = monto_txt.replace(".", "")
+    # Monto: "33.110" → 33110
     try:
-        amount = float(monto_clean) * -1  # gasto → negativo
+        amount = float(monto_txt.replace(".", "")) * -1
     except ValueError:
         return None
 
-    # 3) Intentar sacar comercio (muy heurístico)
-    comercio = "Compra Banco de Chile"
-    comercio_match = re.search(r"en ([A-Z0-9\-\& \.\,]{3,40})", body, flags=re.IGNORECASE)
-    if comercio_match:
-        comercio = comercio_match.group(1).strip()
+    # Comercio: limpiar espacios extra y sufijos de ciudad/país (ej: "Las Condes CL", "SANTIAGO CL")
+    comercio = " ".join(comercio.split())
+    comercio = re.sub(r"\s+[A-Z][a-z][\w\s]+\s+CL$", "", comercio).strip()
+    comercio = re.sub(r"\s+[A-Z]{2,}\s+CL$", "", comercio).strip()
 
-    # 4) Hint de cuenta / tarjeta (últimos 4 dígitos si logras capturarlos)
-    account_hint = "BancoChile"
-    tarjeta_match = re.search(r"terminada en (\d{4})", body)
-    if tarjeta_match:
-        account_hint = f"BancoChile-TC-{tarjeta_match.group(1)}"
+    # Timestamp: "22/03/2026 12:34"
+    try:
+        ts = datetime.strptime(fecha_txt, "%d/%m/%Y %H:%M")
+    except ValueError:
+        ts = datetime.now()
 
-    # 5) Timestamp: por ahora usamos now(); podrías refinar con la fecha del mail
-    ts = datetime.now()
+    account_hint = f"BancoChile-{last4}"
 
     return ParsedExpense(
         amount_clp=amount,
-        description=f"{comercio} (Banco de Chile)",
+        description=comercio,
         timestamp=ts,
         account_hint=account_hint,
     )
