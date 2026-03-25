@@ -23,7 +23,7 @@ def _get_header(headers: List[Dict[str, str]], name: str) -> str:
     return ""
 
 
-def ingest_gmail_expenses(user: Dict, max_results: int = 50) -> List[str]:
+def ingest_gmail_expenses(user: Dict, max_results: int = 50, full_scan: bool = False) -> List[str]:
     """
     Busca emails bancarios en Gmail del usuario y los ingesta en DuckDB.
     La detección de banco es automática vía parsers — no requiere configuración.
@@ -37,7 +37,8 @@ def ingest_gmail_expenses(user: Dict, max_results: int = 50) -> List[str]:
     """
     phone = user["phone"]
     service = build_gmail_service(phone)
-    msgs = list_messages(service, query=COMBINED_GMAIL_QUERY, max_results=max_results)
+    limit = 500 if full_scan else max_results
+    msgs = list_messages(service, query=COMBINED_GMAIL_QUERY, max_results=limit)
     logger.info(f"[{phone}] {len(msgs)} mensajes candidatos")
 
     rows = []

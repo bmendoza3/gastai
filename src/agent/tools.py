@@ -71,8 +71,11 @@ TOOLS = [
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "days": {"type": "integer", "description": "Días hacia atrás (default 7)"},
+                    "days": {"type": "string", "description": "Días hacia atrás, ej: '7', '30'. Usa 'all' para todos los gastos sin límite."},
+                    "month": {"type": "string", "description": "Mes específico (1-12), ej: '2' para febrero."},
+                    "year":  {"type": "string", "description": "Año específico, ej: '2026'."},
                 },
+                "required": [],
             },
         },
     },
@@ -84,17 +87,39 @@ TOOLS = [
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "days": {"type": "integer", "description": "Días hacia atrás (default 7)"},
+                    "days": {"type": "string", "description": "Días hacia atrás, ej: '7', '30'. Usa 'all' para todos los gastos sin límite."},
+                    "month": {"type": "string", "description": "Mes específico (1-12), ej: '2' para febrero."},
+                    "year":  {"type": "string", "description": "Año específico, ej: '2026'."},
                     "chart_type": {
                         "type": "string",
                         "enum": ["pie", "bar"],
                         "description": "Tipo de gráfico: torta (pie) o barras (bar)",
                     },
                 },
+                "required": [],
             },
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_monthly_chart",
+            "description": "Genera un gráfico de barras con el gasto total por mes. Úsalo cuando el usuario pida ver evolución mensual, comparar meses, o 'analizar por mes'.",
+            "parameters": {"type": "object", "properties": {}, "required": []},
+        },
+    },
 ]
+
+
+def _parse_days(inputs: dict) -> int:
+    """Parsea el parámetro days tolerando strings, 'all', valores falsy, etc."""
+    raw = inputs.get("days", "7")
+    if not raw or str(raw).lower() in ("all", "todo", "todos", "0", "none", ""):
+        return 0  # 0 = sin límite
+    try:
+        return int(str(raw))
+    except ValueError:
+        return 7
 
 
 def run_tool(name: str, inputs: dict, phone: str) -> str:
@@ -134,17 +159,24 @@ def run_tool(name: str, inputs: dict, phone: str) -> str:
         return f"Clasificado: '{tx['description']}' → {tx['category']} / {tx['intent']}"
 
     if name == "get_spend_summary":
-        days = int(inputs.get("days", 7))
-        df = get_spend_by_category(user_phone=phone, days_back=days)
+        month = int(inputs["month"]) if inputs.get("month") else None
+        year  = int(inputs["year"])  if inputs.get("year")  else None
+        days  = _parse_days(inputs) if not (month and year) else 0
+        df = get_spend_by_category(user_phone=phone, days_back=days, month=month, year=year)
         if df.empty:
             return f"Sin gastos registrados en los últimos {days} días."
         lines = [f"- {row.category}: {row.spent_clp:,.0f} CLP" for _, row in df.iterrows()]
         return f"Gastos últimos {days} días:\n" + "\n".join(lines)
 
     if name == "get_spend_chart":
-        # Retorna señal especial para que el webhook envíe la imagen
-        days = int(inputs.get("days", 7))
+        month = int(inputs["month"]) if inputs.get("month") else None
+        year  = int(inputs["year"])  if inputs.get("year")  else None
+        days  = _parse_days(inputs) if not (month and year) else 0
         chart_type = inputs.get("chart_type", "bar")
-        return f"__CHART__:{chart_type}:{days}"
+        suffix = f"{month}:{year}" if (month and year) else str(days)
+        return f"__CHART__:{chart_type}:{suffix}"
+
+    if name == "get_monthly_chart":
+        return "__CHART__:monthly:0"
 
     return f"Tool desconocida: {name}"
