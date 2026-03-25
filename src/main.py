@@ -9,8 +9,11 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, Request
 from pydantic import BaseModel
 
+from fastapi.responses import RedirectResponse
+
 from src.agent.agents import chat
-from src.db.storage import con as db_con, get_all_users, get_transaction, insert_transactions
+from src.db.storage import con as db_con, get_all_users, get_transaction, insert_transactions, upsert_user
+from src.ingestion.gmail_client import exchange_code_for_token, get_oauth_url, has_token
 from src.ingestion.gmail_ingest import ingest_gmail_expenses
 from src.integrations.whatsapp_cloud import send_image, send_message, verify_token
 from src.reports.charts import spend_bar_chart, spend_pie_chart
@@ -20,6 +23,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 POLLING_INTERVAL_MINUTES = int(os.getenv("POLLING_INTERVAL_MINUTES", "5"))
+GMAIL_REDIRECT_URI = os.getenv("GMAIL_REDIRECT_URI", "http://localhost:8000/admin/gmail/callback")
 
 
 def _format_new_tx_notification(tx: dict) -> str:
@@ -49,6 +53,9 @@ async def poll_gmail_all_users():
 
     for user in users:
         phone = user["phone"]
+        if not has_token(phone):
+            logger.debug(f"[{phone}] Sin token de Gmail, omitiendo polling")
+            continue
         try:
             new_ids = ingest_gmail_expenses(user)
             for tx_id in new_ids:
@@ -96,6 +103,11 @@ class WhatsAppMessageIn(BaseModel):
 class WhatsAppMessageOut(BaseModel):
     reply: str
 
+class RegisterUserRequest(BaseModel):
+    phone: str    # ej: +56912345678
+    name: str
+
+
 
 # ============== ROOT ==============
 
@@ -129,6 +141,55 @@ def debug_transactions():
         "FROM transactions ORDER BY ts DESC"
     ).fetchdf()
     return df.to_dict(orient="records")
+
+
+# ============== ADMIN: USUARIOS Y OAUTH ==============
+
+@app.post("/admin/users")
+def register_user(req: RegisterUserRequest):
+    """Registra un usuario nuevo. Después agrega bancos y conecta Gmail."""
+    upsert_user(req.phone, req.name)
+    return {
+        "status": "ok",
+        "phone": req.phone,
+        "gmail_connected": has_token(req.phone),
+        "next_steps": [
+            f"POST /admin/users/{req.phone}/banks  (agregar banco)",
+            f"GET  /admin/users/{req.phone}/gmail/connect  (autorizar Gmail)",
+        ],
+    }
+
+
+@app.get("/admin/users")
+def list_users():
+    users = get_all_users()
+    return [
+        {
+            "phone": u["phone"],
+            "name": u["name"],
+            "gmail_connected": has_token(u["phone"]),
+        }
+        for u in users
+    ]
+
+
+@app.get("/admin/users/{phone}/gmail/connect")
+def gmail_connect(phone: str):
+    """Redirige al flujo OAuth de Google para el usuario dado."""
+    url = get_oauth_url(phone, GMAIL_REDIRECT_URI)
+    return RedirectResponse(url)
+
+
+@app.get("/admin/gmail/callback")
+def gmail_callback(request: Request):
+    """Google redirige aquí tras autorizar. Guarda el token y ya empieza el polling."""
+    code = request.query_params.get("code")
+    phone = request.query_params.get("state")
+    if not code or not phone:
+        return {"error": "Faltan parámetros code o state"}
+    exchange_code_for_token(phone, code, GMAIL_REDIRECT_URI)
+    logger.info(f"Gmail conectado para {phone}")
+    return {"status": "ok", "message": f"Gmail conectado para {phone}. El polling comenzará en el próximo ciclo."}
 
 
 # ============== POLLING MANUAL ==============

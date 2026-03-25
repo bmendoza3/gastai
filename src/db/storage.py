@@ -26,6 +26,15 @@ def init_db():
     """)
 
     con.execute("""
+    CREATE TABLE IF NOT EXISTS user_banks (
+        user_phone  TEXT,
+        bank        TEXT,
+        gmail_query TEXT,
+        PRIMARY KEY (user_phone, bank)
+    );
+    """)
+
+    con.execute("""
     CREATE TABLE IF NOT EXISTS transactions (
         tx_id       TEXT PRIMARY KEY,
         user_phone  TEXT,
@@ -39,7 +48,7 @@ def init_db():
     );
     """)
 
-    # Migración: si existe columna account_id (schema viejo), renombrar
+    # Migración: account_id → user_phone
     cols = [r[0] for r in con.execute(
         "SELECT column_name FROM information_schema.columns WHERE table_name='transactions'"
     ).fetchall()]
@@ -49,21 +58,29 @@ def init_db():
     if "source" not in cols:
         con.execute("ALTER TABLE transactions ADD COLUMN source TEXT DEFAULT 'manual'")
 
+    # Migración: mover bank/gmail_query de users → user_banks
+    user_cols = [r[0] for r in con.execute(
+        "SELECT column_name FROM information_schema.columns WHERE table_name='users'"
+    ).fetchall()]
+    if "bank" in user_cols and "gmail_query" in user_cols:
+        con.execute("""
+            INSERT OR IGNORE INTO user_banks (user_phone, bank, gmail_query)
+            SELECT phone, bank, gmail_query FROM users
+            WHERE bank IS NOT NULL AND gmail_query IS NOT NULL
+        """)
+
 
 init_db()
 
 
 # ----------------- Usuarios -----------------
 
-def upsert_user(phone: str, name: str, gmail_query: str, bank: str):
+def upsert_user(phone: str, name: str):
     con.execute("""
-        INSERT INTO users (phone, name, gmail_query, bank)
-        VALUES (?, ?, ?, ?)
-        ON CONFLICT (phone) DO UPDATE SET
-            name = excluded.name,
-            gmail_query = excluded.gmail_query,
-            bank = excluded.bank
-    """, [phone, name, gmail_query, bank])
+        INSERT INTO users (phone, name)
+        VALUES (?, ?)
+        ON CONFLICT (phone) DO UPDATE SET name = excluded.name
+    """, [phone, name])
 
 
 def get_user(phone: str) -> Optional[Dict]:
@@ -73,6 +90,26 @@ def get_user(phone: str) -> Optional[Dict]:
 
 def get_all_users() -> List[Dict]:
     return con.execute("SELECT * FROM users").fetchdf().to_dict(orient="records")
+
+
+# ----------------- Bancos por usuario -----------------
+
+def upsert_user_bank(user_phone: str, bank: str, gmail_query: str):
+    con.execute("""
+        INSERT INTO user_banks (user_phone, bank, gmail_query)
+        VALUES (?, ?, ?)
+        ON CONFLICT (user_phone, bank) DO UPDATE SET gmail_query = excluded.gmail_query
+    """, [user_phone, bank, gmail_query])
+
+
+def get_user_banks(user_phone: str) -> List[Dict]:
+    return con.execute(
+        "SELECT * FROM user_banks WHERE user_phone = ?", [user_phone]
+    ).fetchdf().to_dict(orient="records")
+
+
+def get_all_user_banks() -> List[Dict]:
+    return con.execute("SELECT * FROM user_banks").fetchdf().to_dict(orient="records")
 
 
 # ----------------- Insertar / actualizar -----------------
