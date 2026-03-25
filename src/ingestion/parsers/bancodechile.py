@@ -1,6 +1,8 @@
 # src/ingestion/parsers/bancodechile.py
 from __future__ import annotations
 
+GMAIL_QUERY = 'from:(@bancochile.cl) "compra"'
+
 import re
 from dataclasses import dataclass
 from datetime import datetime
