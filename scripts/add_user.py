@@ -27,27 +27,30 @@ from src.db.storage import upsert_user, get_user
 
 def main():
     parser = argparse.ArgumentParser(description="Registrar usuario en GastAI")
-    parser.add_argument("--phone",      required=True, help="Ej: +56912345678")
-    parser.add_argument("--name",       default=None,  help="Nombre (requerido para usuario nuevo)")
-    parser.add_argument("--skip-gmail", action="store_true", help="No hacer OAuth ahora")
+    parser.add_argument("--phone",       required=True, help="Ej: +56912345678")
+    parser.add_argument("--name",        default=None,  help="Nombre (requerido para usuario nuevo)")
+    parser.add_argument("--telegram-id", default=None,  help="Telegram chat_id (obtener con @userinfobot)")
+    parser.add_argument("--skip-gmail",  action="store_true", help="No hacer OAuth ahora")
     args = parser.parse_args()
 
     phone = args.phone
+    telegram_id = args.telegram_id
 
     # Registrar/actualizar usuario
     existing = get_user(phone)
     if existing:
-        if args.name:
-            upsert_user(phone, args.name)
-            print(f"✓ Usuario actualizado: {args.name} ({phone})")
+        name = args.name or existing["name"]
+        upsert_user(phone, name, telegram_id)
+        if args.name or telegram_id:
+            print(f"✓ Usuario actualizado: {name} ({phone})" + (f" [telegram: {telegram_id}]" if telegram_id else ""))
         else:
             print(f"✓ Usuario existente: {existing['name']} ({phone})")
     else:
         if not args.name:
             print("ERROR: --name es requerido para un usuario nuevo.")
             sys.exit(1)
-        upsert_user(phone, args.name)
-        print(f"✓ Usuario registrado: {args.name} ({phone})")
+        upsert_user(phone, args.name, telegram_id)
+        print(f"✓ Usuario registrado: {args.name} ({phone})" + (f" [telegram: {telegram_id}]" if telegram_id else ""))
 
     # OAuth Gmail
     if args.skip_gmail:
