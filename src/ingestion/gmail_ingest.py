@@ -11,7 +11,7 @@ from src.ingestion.gmail_client import (
     extract_text_from_message,
 )
 from src.ingestion.parsers import parse_email_any, COMBINED_GMAIL_QUERY
-from src.db.storage import insert_transactions
+from src.db.storage import insert_transactions, insert_income
 
 logger = logging.getLogger(__name__)
 
@@ -57,6 +57,18 @@ def ingest_gmail_expenses(user: Dict, max_results: int = 50, full_scan: bool = F
             continue
 
         logger.info(f"[{phone}] {msg_id}: {parsed.description} | {parsed.amount_clp}")
+
+        # Abonos (amount positivo) → tabla incomes
+        if parsed.amount_clp > 0:
+            insert_income(
+                user_phone=phone,
+                amount_clp=parsed.amount_clp,
+                description=parsed.description,
+                income_type="transferencia",
+                ts=parsed.timestamp.isoformat(),
+            )
+            continue
+
         rows.append({
             "tx_id": f"gmail-{msg_id}",
             "timestamp": parsed.timestamp.isoformat(),
@@ -67,6 +79,7 @@ def ingest_gmail_expenses(user: Dict, max_results: int = 50, full_scan: bool = F
             "intent": None,
             "needs_review": True,
             "source": "gmail",
+            "payment_type": getattr(parsed, "payment_type", None),
         })
 
     new_ids = insert_transactions(rows)
