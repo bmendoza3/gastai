@@ -11,22 +11,74 @@ import matplotlib.patches as mpatches
 
 from src.db.storage import get_spend_by_category, get_spend_by_month
 
-# Paleta de colores por categoría
-CATEGORY_COLORS = {
-    "transporte":     "#4A90D9",
-    "comida":         "#E8845A",
-    "supermercado":   "#5CB85C",
-    "salud":          "#D9534F",
-    "entretenimiento":"#9B59B6",
-    "suscripciones":  "#1ABC9C",
-    "ropa":           "#F39C12",
-    "educacion":      "#2980B9",
-    "hogar":          "#795548",
-    "trabajo":        "#607D8B",
-    "viajes":         "#E91E63",
-    "otros":          "#95A5A6",
-    "sin categoría":  "#BDC3C7",
+# ── Paletas de colores ────────────────────────────────────────────────────────
+# Cambia ACTIVE_PALETTE para cambiar el look de todos los gráficos.
+# Opciones: "indigo" | "sunset" | "forest" | "ocean"
+
+ACTIVE_PALETTE = "indigo"
+
+PALETTES = {
+    # Azules y violetas — look profesional/financiero
+    "indigo": [
+        "#4F6EF7", "#7B93F9", "#A5B8FB",
+        "#6C3FC5", "#9B6FE8", "#C4A7F5",
+        "#2EC4B6", "#3DD9C5", "#8EEADE",
+        "#F77F4F", "#F9A87B", "#FBC9A5",
+        "#E84393", "#F27ABB",
+    ],
+    # Naranjas, rosas y rojos cálidos — energético
+    "sunset": [
+        "#FF6B6B", "#FF8E53", "#FFA94D",
+        "#FFD166", "#F9C74F", "#EF476F",
+        "#F15BB5", "#C77DFF", "#9D4EDD",
+        "#06D6A0", "#1B9AAA", "#4CC9F0",
+        "#80B918", "#AACC00",
+    ],
+    # Verdes y tierra — natural/sustentable
+    "forest": [
+        "#2D6A4F", "#40916C", "#52B788",
+        "#74C69D", "#95D5B2", "#B7E4C7",
+        "#D4A017", "#E9C46A", "#F4A261",
+        "#E76F51", "#7B2D8B", "#9B5DE5",
+        "#606C38", "#283618",
+    ],
+    # Azul verdoso — limpio/minimalista
+    "ocean": [
+        "#0077B6", "#0096C7", "#00B4D8",
+        "#48CAE4", "#90E0EF", "#023E8A",
+        "#7B2FBE", "#9D4EDD", "#C77DFF",
+        "#FF6B6B", "#FF9F1C", "#2EC4B6",
+        "#CBEF43", "#3A86FF",
+    ],
 }
+
+# Mapeo semántico: qué índice de la paleta usa cada categoría conocida
+_CATEGORY_PALETTE_IDX = {
+    "transporte":      0,
+    "comida":          3,
+    "supermercado":    6,
+    "salud":           9,
+    "entretenimiento": 1,
+    "suscripciones":   7,
+    "ropa":           10,
+    "educacion":       4,
+    "hogar":           8,
+    "trabajo":         2,
+    "viajes":         11,
+    "otros":          12,
+    "sin categoría":  13,
+}
+
+
+def _category_color(category: str, palette_name: str = ACTIVE_PALETTE) -> str:
+    """Retorna color de la paleta indicada para cualquier categoría."""
+    palette = PALETTES.get(palette_name, PALETTES[ACTIVE_PALETTE])
+    if category in _CATEGORY_PALETTE_IDX:
+        idx = _CATEGORY_PALETTE_IDX[category] % len(palette)
+    else:
+        idx = abs(hash(category)) % len(palette)
+    return palette[idx]
+
 
 CATEGORY_LABELS = {
     "transporte":     "Transporte",
@@ -66,16 +118,17 @@ def _period_label(days_back: int, month: Optional[int], year: Optional[int]) -> 
 
 
 def spend_pie_chart(user_phone: Optional[str] = None, days_back: int = 7,
-                    month: Optional[int] = None, year: Optional[int] = None) -> BytesIO:
+                    month: Optional[int] = None, year: Optional[int] = None,
+                    palette: str = ACTIVE_PALETTE) -> BytesIO:
     """Gráfico de torta: gasto por categoría. Retorna PNG en BytesIO."""
     df = get_spend_by_category(user_phone=user_phone, days_back=days_back, month=month, year=year)
 
     if df.empty:
         return _empty_chart("Sin gastos en el período seleccionado")
 
-    labels = [CATEGORY_LABELS.get(c, c.title()) for c in df["category"]]
+    labels = [CATEGORY_LABELS.get(c, c.replace("_", " ").title()) for c in df["category"]]
     sizes = df["spent_clp"].tolist()
-    colors = [CATEGORY_COLORS.get(c, "#95A5A6") for c in df["category"]]
+    colors = [_category_color(c, palette) for c in df["category"]]
     total = sum(sizes)
 
     fig, ax = plt.subplots(figsize=(7, 5.5), facecolor="#F8F9FA")
@@ -114,7 +167,8 @@ def spend_pie_chart(user_phone: Optional[str] = None, days_back: int = 7,
 
 
 def spend_bar_chart(user_phone: Optional[str] = None, days_back: int = 7,
-                    month: Optional[int] = None, year: Optional[int] = None) -> BytesIO:
+                    month: Optional[int] = None, year: Optional[int] = None,
+                    palette: str = ACTIVE_PALETTE) -> BytesIO:
     """Gráfico de barras horizontales: gasto por categoría ordenado."""
     df = get_spend_by_category(user_phone=user_phone, days_back=days_back, month=month, year=year)
 
@@ -122,9 +176,9 @@ def spend_bar_chart(user_phone: Optional[str] = None, days_back: int = 7,
         return _empty_chart("Sin gastos en el período seleccionado")
 
     df = df.sort_values("spent_clp")
-    labels = [CATEGORY_LABELS.get(c, c.title()) for c in df["category"]]
+    labels = [CATEGORY_LABELS.get(c, c.replace("_", " ").title()) for c in df["category"]]
     sizes = df["spent_clp"].tolist()
-    colors = [CATEGORY_COLORS.get(c, "#95A5A6") for c in df["category"]]
+    colors = [_category_color(c, palette) for c in df["category"]]
     total = sum(sizes)
 
     fig, ax = plt.subplots(figsize=(7, max(3, len(labels) * 0.6 + 1.5)),
