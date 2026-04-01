@@ -26,6 +26,8 @@ from src.db.storage import (
     get_user_categories,
     delete_user_category,
     BASE_CATEGORIES,
+    get_chart_palette,
+    set_chart_palette,
 )
 
 # Categorías base (usadas en definiciones de tools estáticas)
@@ -138,6 +140,24 @@ TOOLS = [
             "name": "get_monthly_chart",
             "description": "Genera un gráfico de barras con el gasto total por mes. Úsalo cuando el usuario pida ver evolución mensual, comparar meses, o 'analizar por mes'.",
             "parameters": {"type": "object", "properties": {}, "required": []},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "set_chart_palette",
+            "description": "Cambia la paleta de colores de los gráficos del usuario. Úsalo cuando pida cambiar colores, estilo visual o paleta de sus gráficos.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "palette": {
+                        "type": "string",
+                        "enum": ["indigo", "sunset", "forest", "ocean"],
+                        "description": "indigo=azul/violeta profesional, sunset=naranja/rosa cálido, forest=verde/tierra, ocean=azul verdoso minimalista",
+                    },
+                },
+                "required": ["palette"],
+            },
         },
     },
     {
@@ -466,6 +486,15 @@ def run_tool(name: str, inputs: dict, phone: str) -> str:
 
     if name == "get_monthly_chart":
         return "__CHART__:monthly:0"
+
+    if name == "set_chart_palette":
+        palette = inputs.get("palette", "indigo")
+        ok = set_chart_palette(phone, palette)
+        if not ok:
+            return f"Paleta '{palette}' no existe. Opciones: indigo, sunset, forest, ocean."
+        names = {"indigo": "Índigo (azul/violeta)", "sunset": "Sunset (naranja/rosa)",
+                 "forest": "Forest (verde/tierra)", "ocean": "Ocean (azul verdoso)"}
+        return f"Paleta cambiada a *{names[palette]}*. El próximo gráfico usará los nuevos colores."
 
     if name == "register_income":
         amount = abs(_to_float(inputs["amount"]))

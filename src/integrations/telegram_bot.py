@@ -404,6 +404,8 @@ async def _handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     reply = chat(phone, text)
 
     if reply.startswith("__CHART__:"):
+        from src.db.storage import get_chart_palette
+        palette = get_chart_palette(phone)
         parts = reply.split(":")
         chart_type = parts[1]
         if chart_type == "monthly":
@@ -413,12 +415,12 @@ async def _handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         elif len(parts) == 4:  # __CHART__:tipo:mes:año
             month, year = int(parts[2]), int(parts[3])
             fn = spend_pie_chart if chart_type == "pie" else spend_bar_chart
-            buf = fn(phone, days_back=0, month=month, year=year)
+            buf = fn(phone, days_back=0, month=month, year=year, palette=palette)
             await send_image(chat_id, buf, caption=f"Tus gastos — {month}/{year}")
         else:  # __CHART__:tipo:dias
             days = int(parts[2])
             fn = spend_pie_chart if chart_type == "pie" else spend_bar_chart
-            buf = fn(phone, days_back=days)
+            buf = fn(phone, days_back=days, palette=palette)
             period = "todos" if days == 0 else (f"últimos {days} días" if days != 30 else "último mes")
             await send_image(chat_id, buf, caption=f"Tus gastos — {period}")
     elif _is_classification_prompt(reply):

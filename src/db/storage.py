@@ -80,6 +80,8 @@ def init_db():
         con.execute("ALTER TABLE users ADD COLUMN telegram_chat_id TEXT")
     if "nickname" not in user_cols:
         con.execute("ALTER TABLE users ADD COLUMN nickname TEXT")
+    if "chart_palette" not in user_cols:
+        con.execute("ALTER TABLE users ADD COLUMN chart_palette TEXT DEFAULT 'indigo'")
 
     con.execute("""
     CREATE TABLE IF NOT EXISTS incomes (
@@ -186,6 +188,19 @@ def delete_user(phone: str):
 def get_user_by_telegram_id(telegram_chat_id: str) -> Optional[Dict]:
     df = con.execute("SELECT * FROM users WHERE telegram_chat_id = ?", [telegram_chat_id]).fetchdf()
     return df.to_dict(orient="records")[0] if not df.empty else None
+
+
+def get_chart_palette(phone: str) -> str:
+    row = con.execute("SELECT chart_palette FROM users WHERE phone = ?", [phone]).fetchone()
+    return (row[0] or "indigo") if row else "indigo"
+
+
+def set_chart_palette(phone: str, palette: str) -> bool:
+    from src.reports.charts import PALETTES
+    if palette not in PALETTES:
+        return False
+    con.execute("UPDATE users SET chart_palette = ? WHERE phone = ?", [palette, phone])
+    return True
 
 
 def get_all_users() -> List[Dict]:

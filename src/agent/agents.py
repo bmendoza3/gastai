@@ -36,6 +36,11 @@ No le pidas que se registre — ya lo está.
 - Resumen por categoría → get_spend_summary
 - Gráfico torta/barras → get_spend_chart (retorna señal, el bot envía la imagen)
 - Gráfico evolución mensual → get_monthly_chart
+- Cambiar colores de gráficos → set_chart_palette
+  - "quiero colores más cálidos" → sunset
+  - "algo más natural/verde" → forest
+  - "azul oscuro, profesional" → indigo
+  - "minimalista, azul claro" → ocean
 - Desglose crédito/débito → get_payment_type_summary
 
 *INGRESOS Y ÍTEMS RECURRENTES — regla clave:*
