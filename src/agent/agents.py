@@ -47,6 +47,10 @@ No le pidas que se registre — ya lo está.
 *GASTOS RECURRENTES — regla clave:*
 - Gasto que se repite cada mes (cuota fija, Netflix, donación, etc.) → add_recurring_item con item_type='expense'
 - Gasto puntual o de un solo mes → add_pending_charge con la fecha de vencimiento
+- Modificar un ítem existente → update_recurring_item (primero list_recurring_items para obtener el id si no lo tienes)
+  - "cambia mi cuota a $320.000" → update_recurring_item con amount=$320.000
+  - "renombra Netflix a Streaming" → update_recurring_item con name="Streaming"
+  - "el celular ahora se cobra el día 5" → update_recurring_item con due_day=5
 
 *CUANDO EL USUARIO DA VARIOS DATOS DE GOLPE:*
 Registra los ítems de UNO EN UNO, en llamadas separadas (una tool call por ítem).
@@ -59,6 +63,8 @@ Ejemplos de mapeo:
 - "gasto puntual de $710.000" → add_pending_charge, due_date fin del mes actual
 - "refugio de gatos $90.000 mensual" → add_recurring_item expense, category='mascota'
 - "suscripciones $35.000 mensual" → add_recurring_item expense, category='suscripciones'
+- "vivir $75.000 mensual" → add_recurring_item expense, category='hogar', name="Gastos varios"
+- "celular $36.000 mensual" → add_recurring_item expense, category='otros', name="Celular"
 
 *BALANCE Y AHORRO*
 - Balance neto mes (ingresos - gastos) → get_net_balance
@@ -85,11 +91,17 @@ Cuando pidan perfil de consumidor, análisis de hábitos, consejos o estrategias
 2. Llama a get_net_balance para contexto de ahorro si hay ingresos registrados
 3. Elabora análisis con: perfil de consumidor, categorías a reducir, estrategias concretas, regla 50/30/20
 
+*UNIDAD DE FOMENTO (UF)*
+- Hoy 1 UF = ${uf} CLP
+- Si el usuario menciona un monto en UF, conviértelo a CLP antes de registrarlo
+- Ejemplo: "1,7 UF" → 1.7 × {uf} CLP
+
 *REGLAS DE FORMATO*
 - Responde en español, breve y directo
 - Montos en CLP con formato legible: $5.000 / $1.200.000
 - Markdown Telegram: *negrita* (un asterisco), _cursiva_, listas con guión (-)
 - NUNCA uses **doble asterisco** ni # encabezados
+- NUNCA menciones nombres de funciones, métodos o tools (get_spend_summary, get_financial_projection, etc.). Describe en lenguaje natural lo que puedes hacer: "ver tus gastos", "proyectar el mes", "ver tu balance"
 
 *CLASIFICACIÓN DE GASTOS*
 Cuando el usuario quiera clasificar un gasto pendiente:
@@ -106,13 +118,29 @@ _history: dict[str, list] = {}
 MAX_HISTORY = 40
 
 
+def _get_uf_value() -> str:
+    """Obtiene el valor de la UF del día desde mindicador.cl."""
+    try:
+        import httpx
+        from datetime import date
+        d = date.today()
+        url = f"https://mindicador.cl/api/uf/{d.day:02d}-{d.month:02d}-{d.year}"
+        resp = httpx.get(url, timeout=5)
+        data = resp.json()
+        valor = data["serie"][0]["valor"]  # float, ej: 38765.34
+        return f"{valor:,.0f}"
+    except Exception:
+        return "38.800"  # fallback aproximado
+
+
 def _system_prompt(phone: str) -> str:
     from datetime import date
     from src.db.storage import get_user
     user = get_user(phone)
     name = (user.get("nickname") or user.get("name") or "usuario") if user else "usuario"
     today = date.today().strftime("%d/%m/%Y")
-    return _SYSTEM_PROMPT_TEMPLATE.format(name=name, today=today)
+    uf = _get_uf_value()
+    return _SYSTEM_PROMPT_TEMPLATE.format(name=name, today=today, uf=uf)
 
 
 def chat(phone: str, user_message: str) -> str:

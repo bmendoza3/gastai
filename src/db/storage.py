@@ -555,6 +555,48 @@ def remove_recurring_item(item_id: str):
     con.execute("UPDATE recurring_items SET is_active = FALSE WHERE item_id = ?", [item_id])
 
 
+def update_recurring_item(item_id: str, **kwargs) -> bool:
+    """Actualiza campos de un ítem recurrente. Retorna True si encontró el ítem."""
+    allowed = {"name", "amount_clp", "category", "income_type", "due_day", "frequency"}
+    fields = {k: v for k, v in kwargs.items() if k in allowed and v is not None}
+    if not fields:
+        return False
+    sets = ", ".join(f"{k} = ?" for k in fields)
+    values = list(fields.values()) + [item_id]
+    con.execute(f"UPDATE recurring_items SET {sets} WHERE item_id = ? AND is_active = TRUE", values)
+    return True
+
+
+def clear_all_user_data(user_phone: str = None) -> dict:
+    """Borra transacciones, ingresos, ítems recurrentes y cargos pendientes.
+    Si user_phone es None, limpia todos los usuarios."""
+    where = "WHERE user_phone = ?" if user_phone else ""
+    params = [user_phone] if user_phone else []
+
+    tx = con.execute(f"SELECT COUNT(*) FROM transactions {where}", params).fetchone()[0]
+    con.execute(f"DELETE FROM transactions {where}", params)
+
+    inc = con.execute(f"SELECT COUNT(*) FROM incomes {where}", params).fetchone()[0]
+    con.execute(f"DELETE FROM incomes {where}", params)
+
+    rec = con.execute(f"SELECT COUNT(*) FROM recurring_items {where}", params).fetchone()[0]
+    con.execute(f"UPDATE recurring_items SET is_active = FALSE {where}", params)
+
+    chg = con.execute(f"SELECT COUNT(*) FROM pending_charges {where}", params).fetchone()[0]
+    con.execute(f"UPDATE pending_charges SET is_paid = TRUE {where}", params)
+
+    return {"transactions": tx, "incomes": inc, "recurring": rec, "charges": chg}
+
+
+def clear_recurring_items(user_phone: str) -> int:
+    result = con.execute(
+        "SELECT COUNT(*) FROM recurring_items WHERE user_phone = ? AND is_active = TRUE",
+        [user_phone]
+    ).fetchone()[0]
+    con.execute("UPDATE recurring_items SET is_active = FALSE WHERE user_phone = ?", [user_phone])
+    return result
+
+
 # ----------------- Cargos pendientes -----------------
 
 def add_pending_charge(user_phone: str, description: str, amount_clp: float,
@@ -579,6 +621,15 @@ def get_pending_charges(user_phone: str, include_paid: bool = False) -> pd.DataF
 
 def mark_charge_paid(charge_id: str):
     con.execute("UPDATE pending_charges SET is_paid = TRUE WHERE charge_id = ?", [charge_id])
+
+
+def clear_pending_charges(user_phone: str) -> int:
+    result = con.execute(
+        "SELECT COUNT(*) FROM pending_charges WHERE user_phone = ? AND is_paid = FALSE",
+        [user_phone]
+    ).fetchone()[0]
+    con.execute("UPDATE pending_charges SET is_paid = TRUE WHERE user_phone = ?", [user_phone])
+    return result
 
 
 # ----------------- Proyección financiera -----------------

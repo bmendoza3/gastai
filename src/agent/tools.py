@@ -17,6 +17,7 @@ from src.db.storage import (
     add_recurring_item,
     get_recurring_items,
     remove_recurring_item,
+    update_recurring_item,
     add_pending_charge,
     get_pending_charges,
     mark_charge_paid,
@@ -280,6 +281,25 @@ TOOLS = [
                 "type": "object",
                 "properties": {
                     "item_id": {"type": "string", "description": "ID del ítem recurrente a eliminar"},
+                },
+                "required": ["item_id"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "update_recurring_item",
+            "description": "Modifica un ítem recurrente existente (monto, nombre, categoría, día de cobro). Úsalo cuando el usuario diga 'cambia', 'actualiza', 'modifica' un ingreso o gasto recurrente. Primero llama list_recurring_items para obtener el item_id si no lo tienes.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "item_id":    {"type": "string", "description": "ID del ítem a modificar"},
+                    "name":       {"type": "string", "description": "Nuevo nombre (opcional)"},
+                    "amount":     {"type": "string", "description": "Nuevo monto en CLP (opcional)"},
+                    "category":   {"type": "string", "description": "Nueva categoría (opcional)"},
+                    "due_day":    {"type": "string", "description": "Nuevo día de cobro 1-31 (opcional)"},
+                    "income_type":{"type": "string", "enum": ["sueldo", "freelance", "arriendo", "bono", "otro"], "description": "Nuevo tipo de ingreso (opcional)"},
                 },
                 "required": ["item_id"],
             },
@@ -569,6 +589,24 @@ def run_tool(name: str, inputs: dict, phone: str) -> str:
     if name == "remove_recurring_item":
         remove_recurring_item(inputs["item_id"])
         return f"Ítem {inputs['item_id']} eliminado."
+
+    if name == "update_recurring_item":
+        kwargs = {}
+        if "name" in inputs:
+            kwargs["name"] = inputs["name"]
+        if "amount" in inputs:
+            kwargs["amount_clp"] = _to_float(inputs["amount"])
+        if "category" in inputs:
+            kwargs["category"] = inputs["category"]
+        if "due_day" in inputs:
+            kwargs["due_day"] = int(inputs["due_day"])
+        if "income_type" in inputs:
+            kwargs["income_type"] = inputs["income_type"]
+        ok = update_recurring_item(inputs["item_id"], **kwargs)
+        if not ok:
+            return f"No se encontró el ítem {inputs['item_id']} o no hay cambios que aplicar."
+        changes = ", ".join(f"{k}={v}" for k, v in kwargs.items())
+        return f"Ítem {inputs['item_id']} actualizado: {changes}."
 
     if name == "add_pending_charge":
         charge_id = add_pending_charge(
