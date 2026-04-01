@@ -7,65 +7,275 @@
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      background: #f9fafb;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #fff;
       color: #1a1a2e;
     }
-    header {
-      background: #1a1a2e;
-      color: white;
-      padding: 16px 40px;
+
+    /* NAV */
+    nav {
       display: flex;
       align-items: center;
-      gap: 12px;
+      justify-content: space-between;
+      padding: 18px 56px;
+      background: white;
+      border-bottom: 1px solid #f0f0f0;
+      position: sticky;
+      top: 0;
+      z-index: 100;
     }
-    header img { height: 44px; width: auto; }
-    header h1 { font-size: 1.6rem; font-weight: 700; letter-spacing: -0.5px; }
-    .hero {
-      max-width: 720px;
-      margin: 80px auto;
-      padding: 0 24px;
-      text-align: center;
-    }
-    .hero h2 {
-      font-size: 2.4rem;
+    .nav-logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 1.4rem;
       font-weight: 800;
+      color: #1a1a2e;
+      text-decoration: none;
+    }
+    .nav-logo span { color: #4f6ef7; }
+    .nav-links {
+      display: flex;
+      gap: 32px;
+      list-style: none;
+    }
+    .nav-links a {
+      text-decoration: none;
+      color: #555;
+      font-size: 0.95rem;
+      font-weight: 500;
+    }
+    .nav-links a:hover { color: #4f6ef7; }
+    .nav-cta {
+      background: #4f6ef7;
+      color: white !important;
+      padding: 10px 22px;
+      border-radius: 8px;
+      font-weight: 600 !important;
+      font-size: 0.9rem !important;
+    }
+    .nav-cta:hover { background: #3d5ce0 !important; color: white !important; }
+
+    /* HERO */
+    .hero {
+      background: #eef1fb;
+      min-height: 88vh;
+      display: flex;
+      align-items: center;
+      padding: 60px 56px 0;
+      gap: 48px;
+      overflow: hidden;
+      position: relative;
+    }
+    .hero-text {
+      flex: 1;
+      max-width: 500px;
+      padding-bottom: 60px;
+    }
+    .hero-eyebrow {
+      display: inline-block;
+      background: #dce3fd;
+      color: #4f6ef7;
+      font-size: 0.82rem;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      padding: 6px 14px;
+      border-radius: 20px;
+      margin-bottom: 20px;
+      text-transform: uppercase;
+    }
+    .hero-text h1 {
+      font-size: 2.8rem;
+      font-weight: 400;
       line-height: 1.2;
       margin-bottom: 20px;
       color: #1a1a2e;
     }
-    .hero p {
-      font-size: 1.15rem;
-      color: #555;
+    .hero-text h1 strong {
+      font-weight: 800;
+    }
+    .hero-text p {
+      font-size: 1.05rem;
+      color: #5a5a72;
       line-height: 1.7;
-      margin-bottom: 16px;
+      margin-bottom: 36px;
+      max-width: 420px;
     }
-    .hero .sub {
-      font-size: 0.95rem;
-      color: #888;
-      margin-bottom: 40px;
+    .hero-buttons {
+      display: flex;
+      gap: 14px;
+      flex-wrap: wrap;
     }
-    .badge {
-      display: inline-block;
-      background: #25D366;
+    .btn-primary {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: #1a1a2e;
       color: white;
-      padding: 12px 28px;
-      border-radius: 30px;
-      font-size: 1rem;
+      padding: 14px 26px;
+      border-radius: 10px;
+      font-size: 0.95rem;
       font-weight: 600;
+      text-decoration: none;
+      transition: background 0.2s;
     }
+    .btn-primary:hover { background: #2d2d4e; }
+    .btn-primary img { height: 20px; }
+    .btn-secondary {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: white;
+      color: #1a1a2e;
+      padding: 14px 26px;
+      border-radius: 10px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      text-decoration: none;
+      border: 1.5px solid #ddd;
+      transition: border-color 0.2s;
+    }
+    .btn-secondary:hover { border-color: #4f6ef7; color: #4f6ef7; }
+
+    /* PHONE MOCKUP */
+    .hero-visual {
+      flex: 1;
+      display: flex;
+      justify-content: center;
+      align-items: flex-end;
+      position: relative;
+      min-height: 580px;
+    }
+    .phone {
+      width: 280px;
+      background: #1a1a2e;
+      border-radius: 40px;
+      padding: 12px;
+      box-shadow: 0 30px 80px rgba(0,0,0,0.25), 0 0 0 1px rgba(255,255,255,0.1);
+      position: relative;
+      z-index: 2;
+    }
+    .phone-notch {
+      width: 80px;
+      height: 22px;
+      background: #1a1a2e;
+      border-radius: 0 0 14px 14px;
+      margin: 0 auto 6px;
+      position: relative;
+      z-index: 3;
+    }
+    .phone-screen {
+      background: #f0f0f0;
+      border-radius: 30px;
+      overflow: hidden;
+      min-height: 520px;
+    }
+    /* Telegram header */
+    .tg-header {
+      background: #4f6ef7;
+      padding: 12px 14px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .tg-back { color: white; font-size: 1.1rem; }
+    .tg-avatar {
+      width: 34px; height: 34px;
+      background: #7c98f9;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1rem;
+      flex-shrink: 0;
+    }
+    .tg-info { flex: 1; }
+    .tg-info .tg-name { color: white; font-size: 0.85rem; font-weight: 700; }
+    .tg-info .tg-status { color: rgba(255,255,255,0.75); font-size: 0.7rem; }
+    /* Messages */
+    .tg-body {
+      padding: 12px 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      background: #eef1fb;
+      min-height: 430px;
+    }
+    .msg {
+      max-width: 88%;
+      padding: 8px 12px;
+      border-radius: 12px;
+      font-size: 0.72rem;
+      line-height: 1.5;
+    }
+    .msg-bot {
+      background: white;
+      align-self: flex-start;
+      border-bottom-left-radius: 3px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+      color: #222;
+    }
+    .msg-user {
+      background: #4f6ef7;
+      color: white;
+      align-self: flex-end;
+      border-bottom-right-radius: 3px;
+    }
+    .msg-time {
+      font-size: 0.6rem;
+      color: rgba(0,0,0,0.35);
+      text-align: right;
+      margin-top: 3px;
+    }
+    .msg-user .msg-time { color: rgba(255,255,255,0.65); }
+    .msg-amount {
+      font-size: 1rem;
+      font-weight: 800;
+      color: #1a1a2e;
+      display: block;
+      margin-bottom: 2px;
+    }
+    .msg-tag {
+      display: inline-block;
+      background: #eef1fb;
+      color: #4f6ef7;
+      border-radius: 6px;
+      padding: 2px 7px;
+      font-size: 0.65rem;
+      font-weight: 600;
+      margin-top: 4px;
+    }
+    /* Decorative blobs */
+    .blob {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(60px);
+      opacity: 0.35;
+      pointer-events: none;
+    }
+    .blob-1 {
+      width: 300px; height: 300px;
+      background: #c7d2fb;
+      top: -60px; right: 60px;
+    }
+    .blob-2 {
+      width: 200px; height: 200px;
+      background: #a5b4fc;
+      bottom: 40px; right: -40px;
+    }
+
+    /* BANKS */
     .banks {
-      max-width: 680px;
-      margin: 0 auto 60px;
-      padding: 0 24px;
+      background: white;
+      padding: 40px 56px;
       text-align: center;
+      border-bottom: 1px solid #f0f0f0;
     }
     .banks p {
-      font-size: 0.85rem;
+      font-size: 0.78rem;
       color: #aaa;
-      margin-bottom: 16px;
       text-transform: uppercase;
-      letter-spacing: 0.5px;
+      letter-spacing: 1px;
+      margin-bottom: 18px;
+      font-weight: 600;
     }
     .bank-list {
       display: flex;
@@ -74,89 +284,207 @@
       justify-content: center;
     }
     .bank-list span {
-      background: white;
-      border: 1px solid #e5e7eb;
+      background: #f8f9fc;
+      border: 1px solid #e8eaf0;
       border-radius: 20px;
-      padding: 6px 16px;
-      font-size: 0.88rem;
+      padding: 6px 18px;
+      font-size: 0.85rem;
       color: #444;
-      box-shadow: 0 1px 4px rgba(0,0,0,0.05);
     }
-    .features {
-      max-width: 800px;
-      margin: 0 auto 80px;
-      padding: 0 24px;
+
+    /* FEATURES */
+    .features-section {
+      padding: 80px 56px;
+      background: white;
+    }
+    .section-label {
+      text-align: center;
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: #4f6ef7;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 12px;
+    }
+    .section-title {
+      text-align: center;
+      font-size: 2rem;
+      font-weight: 800;
+      margin-bottom: 56px;
+      color: #1a1a2e;
+    }
+    .features-grid {
+      max-width: 960px;
+      margin: 0 auto;
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
       gap: 24px;
     }
     .card {
-      background: white;
+      background: #f8f9fc;
       border-radius: 16px;
       padding: 28px 24px;
-      box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+      border: 1px solid #eef0f8;
+      transition: box-shadow 0.2s, transform 0.2s;
     }
-    .card .icon { font-size: 2rem; margin-bottom: 12px; }
-    .card h3 { font-size: 1rem; font-weight: 700; margin-bottom: 8px; }
-    .card p { font-size: 0.9rem; color: #666; line-height: 1.6; }
+    .card:hover {
+      box-shadow: 0 8px 24px rgba(79,110,247,0.1);
+      transform: translateY(-3px);
+    }
+    .card .icon {
+      font-size: 1.8rem;
+      margin-bottom: 14px;
+      display: block;
+    }
+    .card h3 { font-size: 0.95rem; font-weight: 700; margin-bottom: 8px; }
+    .card p { font-size: 0.88rem; color: #666; line-height: 1.6; }
+
+    /* HOW IT WORKS */
     .how {
       background: #1a1a2e;
       color: white;
-      padding: 60px 24px;
+      padding: 80px 56px;
       text-align: center;
     }
-    .how h2 { font-size: 1.8rem; font-weight: 800; margin-bottom: 40px; }
+    .how .section-title { color: white; }
     .steps {
-      max-width: 680px;
+      max-width: 760px;
       margin: 0 auto;
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-      gap: 32px;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 40px;
     }
-    .step { text-align: center; }
+    .step { position: relative; }
     .step .num {
-      width: 40px; height: 40px;
-      background: #25D366;
+      width: 44px; height: 44px;
+      background: #4f6ef7;
       border-radius: 50%;
       display: flex; align-items: center; justify-content: center;
-      font-weight: 800; font-size: 1.1rem;
-      margin: 0 auto 12px;
+      font-weight: 800;
+      margin: 0 auto 14px;
+      font-size: 1rem;
     }
-    .step p { font-size: 0.95rem; color: #ccc; line-height: 1.5; }
+    .step h4 { font-size: 0.88rem; font-weight: 700; margin-bottom: 6px; color: white; }
+    .step p { font-size: 0.84rem; color: #8888aa; line-height: 1.5; }
+
     footer {
       text-align: center;
-      padding: 40px 24px;
-      color: #aaa;
-      font-size: 0.85rem;
+      padding: 36px 24px;
+      color: #999;
+      font-size: 0.84rem;
+      background: white;
+      border-top: 1px solid #f0f0f0;
+    }
+    footer a { color: #4f6ef7; text-decoration: none; }
+
+    @media (max-width: 768px) {
+      nav { padding: 14px 20px; }
+      .nav-links { display: none; }
+      .hero { flex-direction: column; padding: 40px 20px 0; min-height: auto; }
+      .hero-text { padding-bottom: 0; }
+      .hero-text h1 { font-size: 2rem; }
+      .hero-visual { min-height: 400px; }
+      .features-section, .banks { padding: 48px 20px; }
+      .how { padding: 48px 20px; }
     }
   </style>
 </head>
 <body>
 
-  <header>
-    <img src="logo/gastai-logo.png" alt="GastAI logo" />
-    <h1>GastAI</h1>
-  </header>
+  <!-- NAV -->
+  <nav>
+    <a class="nav-logo" href="#">
+      Gast<span>AI</span>
+    </a>
+    <ul class="nav-links">
+      <li><a href="#features">Funcionalidades</a></li>
+      <li><a href="#how">Cómo funciona</a></li>
+      <li><a href="https://t.me/gastai_bot" class="nav-cta">Probar gratis</a></li>
+    </ul>
+  </nav>
 
+  <!-- HERO -->
   <section class="hero">
-    <h2>Entiende en qué gastas tu plata, sin esfuerzo.</h2>
-    <p>
-      GastAI lee las alertas de tu banco, registra cada gasto automáticamente
-      y te ayuda a clasificarlos por WhatsApp. Sin apps, sin formularios.
-      Solo un chat.
-    </p>
-    <p class="sub">Disponible para los principales bancos de Chile</p>
-    <span class="badge">💬 Todo por WhatsApp</span>
+    <div class="blob blob-1"></div>
+    <div class="blob blob-2"></div>
+
+    <div class="hero-text">
+      <span class="hero-eyebrow">Finanzas personales con IA</span>
+      <h1>
+        <strong>Controla tus gastos</strong><br>
+        desde tu Telegram,<br>sin apps extra.
+      </h1>
+      <p>
+        GastAI lee las alertas de tu banco, registra cada gasto automáticamente
+        y te ayuda a entender en qué gastas tu plata — todo por chat.
+      </p>
+      <div class="hero-buttons">
+        <a href="https://t.me/gastai_bot" class="btn-primary">
+          ✈️ &nbsp;Empezar en Telegram
+        </a>
+        <a href="#how" class="btn-secondary">
+          Cómo funciona
+        </a>
+      </div>
+    </div>
+
+    <div class="hero-visual">
+      <div class="phone">
+        <div class="phone-notch"></div>
+        <div class="phone-screen">
+          <!-- Telegram header -->
+          <div class="tg-header">
+            <span class="tg-back">‹</span>
+            <div class="tg-avatar">🤖</div>
+            <div class="tg-info">
+              <div class="tg-name">GastAI</div>
+              <div class="tg-status">en línea</div>
+            </div>
+          </div>
+          <!-- Chat -->
+          <div class="tg-body">
+            <div class="msg msg-bot">
+              💳 <strong>Nuevo gasto detectado</strong><br>
+              <span class="msg-amount">$24.900</span>
+              📍 Rappi · hoy 13:42
+              <br><span class="msg-tag">sin clasificar</span>
+              <div class="msg-time">13:42</div>
+            </div>
+            <div class="msg msg-user">
+              comida, era imprevisto
+              <div class="msg-time">13:43</div>
+            </div>
+            <div class="msg msg-bot">
+              ✅ Listo! Registrado como <strong>comida</strong> (imprevisto).
+              <div class="msg-time">13:43</div>
+            </div>
+            <div class="msg msg-user">
+              cuánto llevo gastado este mes?
+              <div class="msg-time">13:44</div>
+            </div>
+            <div class="msg msg-bot">
+              📊 <strong>Resumen abril</strong><br><br>
+              🍔 Comida · $87.300<br>
+              🚌 Transporte · $34.500<br>
+              🛒 Super · $112.000<br><br>
+              <strong>Total: $233.800</strong> de $600.000
+              <div class="msg-time">13:44</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   </section>
 
+  <!-- BANKS -->
   <section class="banks">
-    <p>Compatible con</p>
+    <p>Compatible con los principales bancos de Chile</p>
     <div class="bank-list">
       <span>Banco de Chile</span>
       <span>Santander</span>
       <span>BCI</span>
-      <span>Itaú</span>
       <span>Banco Estado</span>
+      <span>Itaú</span>
       <span>Scotiabank</span>
       <span>Falabella</span>
       <span>Tenpo</span>
@@ -165,53 +493,75 @@
     </div>
   </section>
 
-  <section class="features">
-    <div class="card">
-      <div class="icon">📩</div>
-      <h3>Ingesta automática</h3>
-      <p>Conecta tu email y GastAI detecta cada compra con tarjeta o cuenta corriente al instante.</p>
-    </div>
-    <div class="card">
-      <div class="icon">🏷️</div>
-      <h3>Clasificación inteligente</h3>
-      <p>Responde en lenguaje natural: "comida, era imprevisto" y el agente lo registra solo.</p>
-    </div>
-    <div class="card">
-      <div class="icon">📊</div>
-      <h3>Reportes visuales</h3>
-      <p>Recibe resúmenes semanales con gráficos directo en tu WhatsApp. Sin entrar a ninguna app.</p>
-    </div>
-    <div class="card">
-      <div class="icon">🐜</div>
-      <h3>Gastos hormiga</h3>
-      <p>Detecta esos gastos chicos y repetidos que suman más de lo que crees al mes.</p>
+  <!-- FEATURES -->
+  <section class="features-section" id="features">
+    <p class="section-label">Funcionalidades</p>
+    <h2 class="section-title">Todo lo que necesitas, sin salir del chat</h2>
+    <div class="features-grid">
+      <div class="card">
+        <span class="icon">📩</span>
+        <h3>Ingesta automática</h3>
+        <p>Conecta tu Gmail y GastAI detecta cada compra con tarjeta al instante, sin que hagas nada.</p>
+      </div>
+      <div class="card">
+        <span class="icon">🏷️</span>
+        <h3>Clasificación natural</h3>
+        <p>Responde "comida, era imprevisto" y el agente lo registra. Sin formularios ni menús.</p>
+      </div>
+      <div class="card">
+        <span class="icon">📊</span>
+        <h3>Reportes en el chat</h3>
+        <p>Gráficos de torta y barras directo en tu Telegram. Sin entrar a ninguna app externa.</p>
+      </div>
+      <div class="card">
+        <span class="icon">💰</span>
+        <h3>Proyección mensual</h3>
+        <p>Sabe cuánto te queda para el mes según tus ingresos, gastos fijos y lo que llevas gastado.</p>
+      </div>
+      <div class="card">
+        <span class="icon">🔔</span>
+        <h3>Alertas proactivas</h3>
+        <p>GastAI te avisa cuando estás cerca del límite en una categoría o detecta gastos inusuales.</p>
+      </div>
+      <div class="card">
+        <span class="icon">🐜</span>
+        <h3>Gastos hormiga</h3>
+        <p>Detecta esos gastos chicos y repetidos que suman más de lo que crees al final del mes.</p>
+      </div>
     </div>
   </section>
 
-  <section class="how">
-    <h2>¿Cómo funciona?</h2>
+  <!-- HOW IT WORKS -->
+  <section class="how" id="how">
+    <p class="section-label" style="color:#7c98f9">Flujo de uso</p>
+    <h2 class="section-title">¿Cómo funciona?</h2>
     <div class="steps">
       <div class="step">
         <div class="num">1</div>
-        <p>Tu banco te manda un email con la alerta de compra</p>
+        <h4>Tu banco te avisa</h4>
+        <p>Te llega un email con la alerta de compra de tu tarjeta o cuenta</p>
       </div>
       <div class="step">
         <div class="num">2</div>
-        <p>GastAI lo lee y te avisa por WhatsApp con los detalles</p>
+        <h4>GastAI lo detecta</h4>
+        <p>Lee el email y te manda un mensaje en Telegram con los detalles del gasto</p>
       </div>
       <div class="step">
         <div class="num">3</div>
-        <p>Tú lo clasificas respondiendo el chat en segundos</p>
+        <h4>Tú lo clasificas</h4>
+        <p>Respondes en lenguaje natural: "super, era previsto" y listo</p>
       </div>
       <div class="step">
         <div class="num">4</div>
-        <p>Cada semana recibes tu resumen de gastos con gráfico</p>
+        <h4>Ves tu resumen</h4>
+        <p>Pide tu reporte cuando quieras o recíbelo automático cada semana</p>
       </div>
     </div>
   </section>
 
   <footer>
-    &copy; 2026 GastAI &mdash; Hecho en Chile 🇨🇱
+    &copy; 2026 GastAI &mdash; Hecho con ☕ en Chile 🇨🇱
+    &nbsp;·&nbsp; <a href="https://t.me/gastai_bot">Telegram</a>
   </footer>
 
 </body>

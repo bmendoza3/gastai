@@ -58,18 +58,59 @@ _app: Application | None = None
 _onboarding: dict[str, str] = {}  # chat_id → estado ("WAITING_NAME")
 
 WELCOME_MSG = (
-    "¡Hola! Soy *GastAI* 👋\n\n"
-    "Puedo ayudarte a:\n"
-    "💳 Detectar gastos automáticamente desde tu email bancario\n"
-    "🗂 Clasificar cada gasto por categoría\n"
-    "📊 Ver resúmenes y gráficos de tus gastos\n"
-    "⚠️ Alertarte sobre gastos hormiga\n\n"
+    "¡Hola! Soy *GastAI* 💸\n\n"
+    "Tu asistente de finanzas personales por Telegram.\n\n"
     "¿Cómo te llamas?"
+)
+
+_ONBOARDING_MENU_MSG = (
+    "¡Listo, {name}! 🎉 Esto es lo que puedo hacer por ti:\n\n"
+    "📧 *Con Gmail conectado:*\n"
+    "  · Detecto tus compras con tarjeta automáticamente\n"
+    "  · Te aviso cada vez que llega un cargo\n"
+    "  · Clasificamos juntos cada gasto\n\n"
+    "📊 *Sin Gmail (planificación manual):*\n"
+    "  · Registras tu sueldo e ingresos\n"
+    "  · Configuras gastos fijos (arriendo, Netflix, etc.)\n"
+    "  · Te digo cuánto te queda libre cada mes\n"
+    "  · Defines presupuestos por categoría\n"
+    "  · Registras deudas y cargos pendientes\n\n"
+    "¿Por dónde quieres empezar?"
+)
+
+_ONBOARDING_KEYBOARD = ReplyKeyboardMarkup(
+    [["📧 Conectar Gmail", "📊 Planificar sin Gmail"]],
+    resize_keyboard=True,
+    one_time_keyboard=True,
+)
+
+_PLANNING_GUIDE_MSG = (
+    "Perfecto. Te guío para configurar tu perfil financiero:\n\n"
+    "*Paso 1* — Cuéntame tu sueldo o ingresos mensuales\n"
+    "_Ej: «Recibo $1.800.000 de sueldo el día 30»_\n\n"
+    "*Paso 2* — Dime tus gastos fijos\n"
+    "_Ej: «Pago arriendo $450.000 el día 5, Netflix $6.000, gym $25.000»_\n\n"
+    "*Paso 3* — Define tus presupuestos (opcional)\n"
+    "_Ej: «Ponme $80.000 de presupuesto en comida»_\n\n"
+    "Con eso te puedo decir exactamente cuánto te queda disponible cada mes 📊\n\n"
+    "¿Empezamos? Cuéntame tu sueldo o ingresos."
 )
 
 
 async def send_message(chat_id: str | int, text: str):
     await _app.bot.send_message(chat_id=chat_id, text=text)
+
+
+async def _reply(update, text: str, **kwargs):
+    """Envía con Markdown; si falla por entidades inválidas, reenvía como texto plano."""
+    from telegram.error import BadRequest
+    try:
+        await update.message.reply_text(text, parse_mode="Markdown", **kwargs)
+    except BadRequest as e:
+        if "parse" in str(e).lower() or "entity" in str(e).lower():
+            await update.message.reply_text(text, **kwargs)
+        else:
+            raise
 
 
 async def send_image(chat_id: str | int, image_buf: BytesIO, caption: str = ""):
@@ -82,7 +123,8 @@ _CATEGORY_KEYBOARD = ReplyKeyboardMarkup(
         ["🚗 transporte",    "🍔 comida",         "🛒 supermercado"],
         ["💊 salud",         "🎬 entretenimiento", "📱 suscripciones"],
         ["👕 ropa",          "📚 educacion",       "🏠 hogar"],
-        ["💼 trabajo",       "✈️ viajes",           "📦 otros"],
+        ["💼 trabajo",       "✈️ viajes",           "🐾 mascota"],
+        ["📦 otros"],
     ],
     resize_keyboard=True,
     one_time_keyboard=True,
@@ -98,7 +140,8 @@ _INTENT_KEYBOARD = ReplyKeyboardMarkup(
 
 _CATEGORIES = {
     "transporte", "comida", "supermercado", "salud", "entretenimiento",
-    "suscripciones", "ropa", "educacion", "hogar", "trabajo", "viajes", "otros",
+    "suscripciones", "ropa", "educacion", "hogar", "trabajo", "viajes",
+    "mascota", "otros",
 }
 _INTENTS = {"previsto", "imprevisto"}
 
@@ -174,16 +217,20 @@ async def _handle_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         from src.ingestion.gmail_client import has_token
         phone = user["phone"]
         display = user.get("nickname") or user["name"]
-        if has_token(phone):
-            await update.message.reply_text(
-                f"¡Hola de nuevo, {display}! 👋\nPregúntame sobre tus gastos cuando quieras."
-            )
-        else:
-            await update.message.reply_text(
-                f"¡Hola de nuevo, {display}! 👋\n\n"
-                "Aún no has conectado tu Gmail. Hazlo para que pueda detectar tus gastos automáticamente:\n\n"
-                + _gmail_connect_msg(phone)
-            )
+        gmail_status = "✅ Gmail conectado" if has_token(phone) else "❌ Gmail no conectado (/gmail para conectar)"
+        await update.message.reply_text(
+            f"¡Hola de nuevo, {display}! 👋\n\n"
+            f"{gmail_status}\n\n"
+            "¿Qué quieres hacer?\n"
+            "· «ver mis gastos» / «gráfico» / «resumen del mes»\n"
+            "· «cuánto me queda este mes» → proyección financiera\n"
+            "· «mi presupuesto» → estado vs límites\n"
+            "· «gastos recurrentes» → ver/agregar fijos\n"
+            "· «registrar gasto» → anotar algo manual\n"
+            "· «clasificar pendientes» → revisar alertas del banco\n\n"
+            "O simplemente escríbeme en lenguaje natural 💬",
+            parse_mode="Markdown",
+        )
         return
     _onboarding[chat_id] = "WAITING_NAME"
     await update.message.reply_text(WELCOME_MSG, parse_mode="Markdown")
@@ -283,13 +330,33 @@ async def _handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         full_name, nickname = _extract_name(text)
         phone = f"tg_{chat_id}"
         upsert_user(phone, full_name, telegram_chat_id=chat_id, nickname=nickname)
-        del _onboarding[chat_id]
+        _onboarding[chat_id] = "WAITING_ONBOARDING_CHOICE"
         await update.message.reply_text(
-            f"¡Listo, {nickname}! 🎉\n\n"
-            "¿Quieres conectar tu Gmail para detectar gastos automáticamente?\n"
-            "(Incluye bandeja principal y spam/trash)\n\n"
-            + _gmail_connect_msg(phone),
+            _ONBOARDING_MENU_MSG.format(name=nickname),
+            parse_mode="Markdown",
+            reply_markup=_ONBOARDING_KEYBOARD,
         )
+        return
+
+    # ── Onboarding: eligiendo ruta ──
+    if _onboarding.get(chat_id) == "WAITING_ONBOARDING_CHOICE":
+        del _onboarding[chat_id]
+        if not user:
+            await update.message.reply_text("Ocurrió un error. Escribe /start para reintentar.")
+            return
+        phone = user["phone"]
+        if "conectar" in text.lower():
+            await update.message.reply_text(
+                "Perfecto 📧 Conecta tu Gmail para que pueda detectar tus compras automáticamente.\n\n"
+                + _gmail_connect_msg(phone),
+                reply_markup=ReplyKeyboardRemove(),
+            )
+        else:
+            await update.message.reply_text(
+                _PLANNING_GUIDE_MSG,
+                parse_mode="Markdown",
+                reply_markup=ReplyKeyboardRemove(),
+            )
         return
 
     # ── Clasificación guiada: esperando categoría ──
@@ -358,11 +425,11 @@ async def _handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         tx_id = _extract_pending_tx_id(phone)
         if tx_id:
             _onboarding[chat_id] = f"CLASSIFYING_CATEGORY:{tx_id}"
-            await update.message.reply_text(reply, reply_markup=_CATEGORY_KEYBOARD)
+            await _reply(update, reply, reply_markup=_CATEGORY_KEYBOARD)
         else:
-            await update.message.reply_text(reply)
+            await _reply(update, reply)
     else:
-        await update.message.reply_text(reply)
+        await _reply(update, reply)
 
 
 async def start_bot():

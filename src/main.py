@@ -12,7 +12,7 @@ from pydantic import BaseModel
 from fastapi.responses import HTMLResponse, RedirectResponse
 
 from src.agent.agents import chat
-from src.db.storage import con as db_con, get_all_users, get_transaction, insert_transactions, upsert_user
+from src.db.storage import con as db_con, get_all_users, get_transaction, insert_transactions, upsert_user, clear_recurring_items, clear_pending_charges, clear_all_user_data
 from src.ingestion.gmail_client import exchange_code_for_token, get_oauth_url, has_token
 from src.ingestion.gmail_ingest import ingest_gmail_expenses
 from src.integrations.messaging import send_image, send_message
@@ -269,6 +269,42 @@ def _callback_html(status: str, name_or_error: str = "") -> str:
   </div>
 </body>
 </html>"""
+
+
+# ============== RESET DE DATOS ==============
+
+@app.delete("/admin/users/{phone}/recurring")
+async def reset_recurring(phone: str):
+    """Elimina todos los ítems recurrentes de un usuario."""
+    n = clear_recurring_items(phone)
+    return {"deleted": n}
+
+
+@app.delete("/admin/users/{phone}/charges")
+async def reset_charges(phone: str):
+    """Marca como pagados todos los cargos pendientes de un usuario."""
+    n = clear_pending_charges(phone)
+    return {"cleared": n}
+
+
+@app.delete("/admin/users/{phone}/reset")
+async def reset_all(phone: str):
+    """Limpia ítems recurrentes y cargos pendientes de un usuario."""
+    rec = clear_recurring_items(phone)
+    chg = clear_pending_charges(phone)
+    return {"recurring_deleted": rec, "charges_cleared": chg}
+
+
+@app.delete("/admin/users/{phone}/data")
+async def reset_user_data(phone: str):
+    """Borra todos los datos financieros de un usuario (transacciones, ingresos, recurrentes, cargos)."""
+    return clear_all_user_data(phone)
+
+
+@app.delete("/admin/data")
+async def reset_all_data():
+    """Borra todos los datos financieros de TODOS los usuarios. Usar solo en dev."""
+    return clear_all_user_data()
 
 
 # ============== POLLING MANUAL ==============
